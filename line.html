@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LINE Check-in</title>
+
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- UI Styles (using our main style variables but customized for Mobile/LINE layout) -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- LIFF SDK -->
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body {
+            background: #f1f5f9;
+            padding: 16px;
+            font-family: 'Inter', 'Noto Sans Thai', sans-serif;
+        }
+
+        .liff-container {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .profile-img {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            background: #e2e8f0;
+            object-fit: cover;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .btn-line {
+            background: #00B900;
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 10px rgba(0, 185, 0, 0.2);
+        }
+
+        .btn-checkout-line {
+            background: #ef4444;
+            /* แดง */
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loading" class="loading-overlay">
+        <i class="fa-solid fa-spinner fa-spin fa-3x" style="color: #00B900; margin-bottom: 16px;"></i>
+        <h3 id="loading-text">กำลังเชื่อมต่อ LINE...</h3>
+    </div>
+
+    <div id="app-content" style="display: none;">
+        <div class="liff-container">
+            <img id="profile-img" src="" alt="Profile" class="profile-img">
+            <h3 id="display-name" style="margin-bottom: 4px;">-</h3>
+            <p id="emp-id" style="color: #64748b; font-size: 14px; margin-bottom: 16px;">กำลังตรวจสอบสิทธิ์...</p>
+
+            <!-- GPS Status -->
+            <div id="gps-status"
+                style="background:#e0f2fe; color:#0284c7; padding: 10px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;">
+                <i class="fa-solid fa-location-crosshairs"></i> กำลังค้นหาตำแหน่งของคุณ...
+            </div>
+
+            <div class="form-group" style="text-align: left; margin-bottom: 16px;">
+                <label
+                    style="font-size:13px; font-weight:bold; margin-bottom: 6px; display:block;">หน้างาน/สาขา:</label>
+                <select id="line-workplace" class="form-control"
+                    style="width:100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <option value="">-- รอข้อมูลหน้างาน --</option>
+                </select>
+            </div>
+
+            <button id="btn-in" class="btn-line" onclick="handleLineCheckin('Check-in')" disabled>
+                <i class="fa-solid fa-right-to-bracket"></i> เช็คอิน (เข้างาน)
+            </button>
+            <button id="btn-out" class="btn-checkout-line" onclick="handleLineCheckin('Check-out')" disabled>
+                <i class="fa-solid fa-right-from-bracket"></i> เช็คเอาท์ (ออกงาน)
+            </button>
+        </div>
+    </div>
+
+    <!-- Note: We must redefine Supabase locally because line.html might be standalone -->
+    <script>
+        // 1. ใส่ตั้งค่า Supabase และ LIFF ID ของคุณ
+        const SUPABASE_URL = 'https://jkrcjfjfncyvymdwcedi.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprcmNqZmpmbmN5dnltZHdjZWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NTMwMDksImV4cCI6MjA4NzMyOTAwOX0.awHuGfZ7Wr_OlMvGTBgS4vvbyB1BBR-06rEYMxsNGLk';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // ใส่ LIFF ID ที่ได้จาก LINE Developers
+        const MY_LIFF_ID = "YOUR_LIFF_ID_HERE";
+
+        // Global Variables
+        let currentLineProfile = null;
+        let employeeData = null; // ข้อมูลจาก Supabase profiles
+        let currentLat = null, currentLng = null;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            // โหลดพิกัด GPS
+            initGeolocation();
+            // โหลดสถานที่
+            loadWorkplaces();
+
+            // ฟังก์ชันสำหรับ Test บนคอม (เมื่อไม่มี LIFF ID หรือเข้าผ่านเบราว์เซอร์ปกติ)
+            if (MY_LIFF_ID === "YOUR_LIFF_ID_HERE") {
+                document.getElementById('loading-text').textContent = "กรุณาแก้ไข YOUR_LIFF_ID_HERE ใน source code";
+                return;
+            }
+
+            initializeLiff(MY_LIFF_ID);
+        });
+
+        async function initializeLiff(liffId) {
+            try {
+                await liff.init({ liffId: liffId });
+                if (liff.isLoggedIn()) {
+                    runApp();
+                } else {
+                    liff.login();
+                }
+            } catch (err) {
+                document.getElementById('loading-text').textContent = "LIFF Init Failed: " + err.message;
+            }
+        }
+
+        async function runApp() {
+            try {
+                // 1. ดึงข้อมูล LINE
+                const profile = await liff.getProfile();
+                currentLineProfile = profile;
+                document.getElementById('profile-img').src = profile.pictureUrl || 'https://ui-avatars.com/api/?name=Line+User';
+                document.getElementById('display-name').textContent = profile.displayName;
+
+                // 2. ค้นหาใน Supabase Profiles ด้วย Line User ID
+                const { data, error } = await supabaseClient
+                    .from('profiles')
+                    .select('id, employee_id, full_name')
+                    .eq('line_user_id', profile.userId)
+                    .single();
+
+                if (error || !data) {
+                    // ไม่พบข้อมูล
+                    document.getElementById('emp-id').textContent = "ไม่พบบัญชีพนักงาน โปรดติดต่อ HR";
+                    document.getElementById('emp-id').style.color = "red";
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('app-content').style.display = 'block';
+                    return;
+                }
+
+                // พบข้อมูล
+                employeeData = data;
+                document.getElementById('emp-id').textContent = `รหัสพนักงาน: ${data.employee_id}`;
+                document.getElementById('emp-id').style.color = "#10b981";
+
+                // อนุญาตให้คลิกปุ่มได้ (ถ้า GPS พร้อม)
+                checkAllReady();
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('app-content').style.display = 'block';
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loading-text').textContent = "เกิดข้อผิดพลาดในการยืนยันตัวตน";
+            }
+        }
+
+        function initGeolocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        currentLat = pos.coords.latitude;
+                        currentLng = pos.coords.longitude;
+                        document.getElementById('gps-status').innerHTML = `<i class="fa-solid fa-check"></i> ได้พิกัดเรียบร้อย (ความแม่นยำ ±${Math.round(pos.coords.accuracy)}m)`;
+                        document.getElementById('gps-status').style.background = "#dcfce7";
+                        document.getElementById('gps-status').style.color = "#15803d";
+                        checkAllReady();
+                    },
+                    err => {
+                        document.getElementById('gps-status').innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ไม่สามารถดึง GPS ได้ โปรดเปิด Location Service`;
+                        document.getElementById('gps-status').style.background = "#fee2e2";
+                        document.getElementById('gps-status').style.color = "#b91c1c";
+                    }, { enableHighAccuracy: true }
+                );
+            }
+        }
+
+        async function loadWorkplaces() {
+            const select = document.getElementById('line-workplace');
+            const { data, error } = await supabaseClient.from('workplaces').select('id, name').eq('status', 'ใช้งาน');
+            if (data && data.length > 0) {
+                select.innerHTML = '<option value="">-- เลือกสถานที่ --</option>' + data.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+            } else {
+                select.innerHTML = '<option value="">-- ไม่มีหน้างานที่เปิดใช้งาน --</option>';
+            }
+        }
+
+        function checkAllReady() {
+            if (employeeData && currentLat && currentLng) {
+                document.getElementById('btn-in').disabled = false;
+                document.getElementById('btn-out').disabled = false;
+            }
+        }
+
+        async function handleLineCheckin(type) {
+            const wpId = document.getElementById('line-workplace').value;
+            if (!wpId) {
+                alert("กรุณาเลือกหน้างาน/สาขา ก่อนกดบันทึก");
+                return;
+            }
+
+            document.getElementById('loading-text').textContent = "กำลังบันทึกข้อมูล...";
+            document.getElementById('loading').style.display = 'flex';
+
+            try {
+                // Fetch workplace for distance calculation (Simplified here. Requires exact checking.)
+                const { data: wpData } = await supabaseClient.from('workplaces').select('lat, lng, radius').eq('id', wpId).single();
+
+                let status = 'ปกติ';
+                let distance = 0;
+                if (wpData) {
+                    // คำนวณระยะทาง Haversine...
+                    const R = 6371e3;
+                    const φ1 = currentLat * Math.PI / 180;
+                    const φ2 = wpData.lat * Math.PI / 180;
+                    const Δφ = (wpData.lat - currentLat) * Math.PI / 180;
+                    const Δλ = (wpData.lng - currentLng) * Math.PI / 180;
+                    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                    distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    status = distance <= wpData.radius ? 'ปกติ' : 'นอกพื้นที่';
+                }
+
+                const payload = {
+                    user_id: employeeData.id,
+                    workplace_id: wpId,
+                    type: type,
+                    lat: currentLat,
+                    lng: currentLng,
+                    distance_meters: Math.round(distance),
+                    status: status,
+                    date: new Date().toLocaleDateString('en-CA'),
+                    time: new Date().toLocaleTimeString('en-GB')
+                };
+
+                const { error } = await supabaseClient.from('attendance_logs').insert([payload]);
+                if (error) throw error;
+
+                // เสร็จสิ้น ปิดหน้าต่าง LIFF ทันที / หรือโชว์ Alert
+                alert(`บันทึก ${type} สำเร็จ!`);
+                if (liff.isInClient()) {
+                    liff.closeWindow();
+                } else {
+                    document.getElementById('loading').style.display = 'none';
+                }
+
+            } catch (e) {
+                alert("เกิดข้อผิดพลาด: " + e.message);
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+    </script>
+</body>
+
+</html>
