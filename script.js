@@ -20,6 +20,10 @@ const MOCK_USER = {
 
 // ─── Initialization ─────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+    // Prevent redirect loop and script errors on standalone pages
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes('login.html') || path.includes('line.html')) return;
+
     // 1. ตรวจสอบสถานะการเข้าสู่ระบบ
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error || !session) {
