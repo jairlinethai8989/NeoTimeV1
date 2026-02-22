@@ -1,4 +1,4 @@
-<script>
+
     // ─── App Global State ─────────────────────────────────
     const APP_STATE = {
         currentPage: 'dashboard'
@@ -1593,4 +1593,3 @@
             `).join('');
         }, 500);
     }
-</script>
