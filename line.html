@@ -149,7 +149,30 @@
 
             // ฟังก์ชันสำหรับ Test บนคอม (เมื่อไม่มี LIFF ID หรือเข้าผ่านเบราว์เซอร์ปกติ)
             if (MY_LIFF_ID === "YOUR_LIFF_ID_HERE") {
-                document.getElementById('loading-text').textContent = "กรุณาแก้ไข YOUR_LIFF_ID_HERE ใน source code";
+                document.getElementById('loading-text').textContent = "🔧 เข้าสู่โหมดทดสอบ (Test Mode)...";
+                setTimeout(() => {
+                    // MOCK USER DATA FOR TESTING
+                    currentLineProfile = {
+                        userId: 'U1234567890testuser',
+                        displayName: 'Test User (No LIFF)',
+                        pictureUrl: 'https://ui-avatars.com/api/?name=Test+User&background=00B900&color=fff'
+                    };
+                    employeeData = {
+                        id: '00000000-0000-0000-0000-000000000000',
+                        employee_id: 'EMP-TEST',
+                        full_name: 'Test Administrator'
+                    };
+
+                    document.getElementById('profile-img').src = currentLineProfile.pictureUrl;
+                    document.getElementById('display-name').textContent = currentLineProfile.displayName;
+                    document.getElementById('emp-id').textContent = `รหัสพนักงาน: ${employeeData.employee_id} (Test Mode)`;
+                    document.getElementById('emp-id').style.color = "#10b981";
+
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('app-content').style.display = 'block';
+
+                    checkAllReady();
+                }, 1000);
                 return;
             }
 

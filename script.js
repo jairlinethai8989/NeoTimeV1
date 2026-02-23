@@ -1,4 +1,4 @@
-
+console.log("---- SCRIPT.JS STARTING ----");
 // ─── App Global State ─────────────────────────────────
 const APP_STATE = {
     currentPage: 'dashboard'
@@ -7,7 +7,36 @@ const APP_STATE = {
 // ─── Superbase Initialization ──────────────────────────────
 const SUPABASE_URL = 'https://jkrcjfjfncyvymdwcedi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprcmNqZmpmbmN5dnltZHdjZWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NTMwMDksImV4cCI6MjA4NzMyOTAwOX0.awHuGfZ7Wr_OlMvGTBgS4vvbyB1BBR-06rEYMxsNGLk';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let supabase;
+try {
+    if (window.supabase) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: {
+                persistSession: window.location.protocol !== 'file:'
+            }
+        });
+    } else {
+        console.warn("window.supabase is not defined. Using mock supabase client.");
+    }
+} catch (error) {
+    console.warn("ไม่สามารถเรียกใช้ Supabase ได้:", error);
+}
+
+// ─── Dummy mock if it totally fails (Offline / Missing CDN) ───
+if (!supabase) {
+    supabase = {
+        auth: {
+            getSession: async () => ({ data: { session: null }, error: null }),
+            signOut: async () => { }
+        },
+        from: () => ({
+            select: () => ({ eq: () => ({ single: async () => ({ data: null }), order: async () => ({ data: [] }) }), single: async () => ({ data: null }), order: async () => ({ data: [] }) }),
+            insert: async () => ({ error: null }),
+            update: () => ({ eq: async () => ({ error: null }) }),
+            delete: () => ({ eq: async () => ({ error: null }) })
+        })
+    };
+}
 
 let currentLat = null, currentLng = null;
 let clockIntervalId = null;
@@ -32,7 +61,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    // 2. ถ้าล็อกอินแล้ว ดึงข้อมูล Profile มาเก็บใน MOCK_USER ชั่วคราว (หรือตัวแปร USER_PROFILE)
+    // 2. ถ้าล็อกอินแล้ว ดึงข้อมูล Profile มาเก็บใน MOCK_USER
     await loadCurrentUserProfile(session.user.id);
 
     // Update Header Date
@@ -79,7 +108,7 @@ function updateHeaderDate() {
 }
 
 // ─── Navigation Logic ─────────────────────────────────
-function navigateTo(pageId, element, isChild = false) {
+window.navigateTo = function (pageId, element, isChild = false) {
     APP_STATE.currentPage = pageId;
 
     // 1. Hide all pages
@@ -172,29 +201,21 @@ function navigateTo(pageId, element, isChild = false) {
     } else {
         if (clockIntervalId) clearInterval(clockIntervalId);
     }
-}
+};
 
 // ─── Dropdown Toggle ─────────────────────────────────
-function toggleNavGroup(element) {
+window.toggleNavGroup = function (element) {
     const group = element.parentElement;
-
-    // Optional: Close other groups like an accordion (uncomment if desired)
-    /*
-    document.querySelectorAll('.nav-group').forEach(g => {
-      if (g !== group) g.classList.remove('expanded');
-    });
-    */
-
     group.classList.toggle('expanded');
-}
+};
 
 // ─── Mobile Sidebar Toggle ────────────────────────────
-function toggleSidebar() {
+window.toggleSidebar = function () {
     document.getElementById('sidebar').classList.toggle('open');
-}
+};
 
 // ─── Placeholders ─────────────────────────────────────
-function refreshPageData() {
+window.refreshPageData = function () {
     console.log('Refreshing data for:', APP_STATE.currentPage);
     if (APP_STATE.currentPage === 'users') loadUsers();
     if (APP_STATE.currentPage === 'dashboard') loadDashboard();
@@ -207,15 +228,15 @@ function refreshPageData() {
     if (APP_STATE.currentPage === 'report-general') loadGeneralReport();
     if (APP_STATE.currentPage === 'report-leave') loadLeaveReport();
     if (APP_STATE.currentPage === 'audit-log') loadAuditLog();
-}
+};
 
-async function logout() {
+window.logout = async function () {
     if (confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
         console.log('Logging out...');
         await supabase.auth.signOut();
         window.location.href = 'login.html';
     }
-}
+};
 
 // ─── CHECK-IN / CHECK-OUT MODULE ─────────────────────
 function setupCheckinPage() {
@@ -441,39 +462,42 @@ async function fetchDashboardStats() {
             .from('attendance_logs')
             .select('user_id, status, type, time')
             .eq('date', today)
-            .eq('type', 'Check-in'); // count only check-ins for present status
+            .eq('type', 'Check-in');
         if (errLogs) throw errLogs;
 
-        // 3. Process data
-        const uniqueCheckins = new Set(logs.map(log => log.user_id));
-        const totalCheckins = uniqueCheckins.size;
+        // 3. Process data map per user (We want the *earliest* check-in status per user)
+        const userFirstCheckinMap = {};
+        logs.forEach(log => {
+            if (!userFirstCheckinMap[log.user_id]) {
+                userFirstCheckinMap[log.user_id] = log;
+            } else {
+                // Keep the earliest time
+                if (log.time < userFirstCheckinMap[log.user_id].time) {
+                    userFirstCheckinMap[log.user_id] = log;
+                }
+            }
+        });
 
-        // Advanced categorization (simplified based on your status rules)
+        const uniqueCheckins = Object.keys(userFirstCheckinMap).length;
+        const totalCheckins = uniqueCheckins;
+
+        // Count base on unique users
         let onTime = 0;
         let late = 0;
         let outOfRange = 0;
 
-        logs.forEach(log => {
-            // We only count each user once (their first check-in of the day)
-            // But for simplicity in this loop we'll just parse all Check-ins. 
-            // In production, we should filter by the EARLIEST check-in per user.
-            if (log.status === 'ปกติ') onTime++;
-            else if (log.status === 'สาย') late++;
-            else if (log.status === 'นอกพื้นที่') outOfRange++;
+        Object.values(userFirstCheckinMap).forEach(firstLog => {
+            if (firstLog.status === 'ปกติ') onTime++;
+            else if (firstLog.status === 'สาย') late++;
+            else if (firstLog.status === 'นอกพื้นที่') outOfRange++;
         });
-
-        // Correcting counts to match unique users (rough estimation for UI demo)
-        const totalProcessed = onTime + late + outOfRange;
-        const normalizedOnTime = totalProcessed > 0 ? Math.round((onTime / totalProcessed) * totalCheckins) : 0;
-        const normalizedLate = totalProcessed > 0 ? Math.round((late / totalProcessed) * totalCheckins) : 0;
-        const normalizedOutOfRange = totalProcessed > 0 ? Math.round((outOfRange / totalProcessed) * totalCheckins) : 0;
 
         updateDashboardUI({
             totalEmployees: totalEmployees || 0,
             totalCheckins: totalCheckins,
-            onTime: normalizedOnTime,
-            late: normalizedLate,
-            outOfRange: normalizedOutOfRange
+            onTime: onTime,
+            late: late,
+            outOfRange: outOfRange
         });
 
     } catch (error) {
@@ -872,7 +896,8 @@ async function loadRecords() {
                     profiles:user_id(employee_id, full_name),
                     workplaces:workplace_id(name)
                 `)
-            .order('timestamp', { ascending: false });
+            .order('date', { ascending: false })
+            .order('time', { ascending: false });
 
         if (filterDate) {
             query = query.eq('date', filterDate);
