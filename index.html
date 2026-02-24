@@ -34,12 +34,12 @@
   </button>
 
   <!-- ═══ SIDEBAR ═══ -->
-  <aside class="sidebar" id="sidebar" style="background-color: #1e293b; color: #f8fafc; border-right: none;">
-    <div class="sidebar-header" style="border-bottom: 1px solid #334155;">
-      <div class="logo" style="background-color: var(--primary);"><i class="fa-solid fa-clock"></i></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo"><i class="fa-solid fa-clock"></i></div>
       <div class="title">
-        <h2 style="color: #f8fafc;">Neo Work Life</h2>
-        <p style="color: #94a3b8;">TIME ATTENDANCE</p>
+        <h2>Neo Work Life</h2>
+        <p>TIME ATTENDANCE</p>
       </div>
     </div>
 
@@ -970,14 +970,14 @@
             </div>
             
             <div class="table-responsive">
-                <table class="data-table">
+                <table class="data-table wl-table-styled" style="width: 100%;">
                     <thead>
                         <tr>
-                            <th style="width: 120px;" class="wl-col-date">วันที่</th>
-                            <th style="width: 200px;">เวลาเริ่ม - เวลาสิ้นสุด</th>
-                            <th>รายละเอียดการทำงาน / โปรเจกต์ <span class="text-danger">*</span></th>
-                            <th style="width: 140px;">สถานะงาน</th>
-                            <th style="width: 80px;">จัดการ</th>
+                            <th style="width: 120px; vertical-align: middle;" class="wl-col-date">วันที่</th>
+                            <th style="width: 200px; vertical-align: middle;">เวลาเริ่ม - เวลาสิ้นสุด</th>
+                            <th style="vertical-align: middle;">รายละเอียดการทำงาน / โปรเจกต์ <span class="text-danger">*</span></th>
+                            <th style="width: 140px; vertical-align: middle;">สถานะงาน</th>
+                            <th style="width: 80px; vertical-align: middle; text-align: center;">จัดการ</th>
                         </tr>
                     </thead>
                     <tbody id="worklog-tbody">

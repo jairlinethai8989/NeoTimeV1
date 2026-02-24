@@ -2955,7 +2955,7 @@ function addWorklogEntry() {
         startTime: '09:00',
         endTime: '18:00',
         detail: '',
-        status: 'Pending'
+        status: 'Done'
     });
     renderWorklog();
 }
@@ -3004,27 +3004,27 @@ function renderWorklog() {
         
         let dateHtml = '';
         if(wlViewMode !== 'daily') {
-             dateHtml = `<td><input type="date" class="form-control" value="${entry.date}" onchange="window.updateWorklogData('${entry.id}', 'date', this.value)"></td>`;
+             dateHtml = `<td style="vertical-align: middle;"><input type="date" class="form-control" value="${entry.date}" onchange="window.updateWorklogData('${entry.id}', 'date', this.value)"></td>`;
         }
         
         tr.innerHTML = `
             ${dateHtml}
-            <td>
+            <td style="vertical-align: middle;">
               <div style="display:flex; align-items:center; gap:8px;">
                 <input type="time" class="form-control" style="padding: 6px;" value="${entry.startTime}" onchange="window.updateWorklogData('${entry.id}', 'startTime', this.value)">
                 <span>-</span>
                 <input type="time" class="form-control" style="padding: 6px;" value="${entry.endTime}" onchange="window.updateWorklogData('${entry.id}', 'endTime', this.value)">
               </div>
             </td>
-            <td><input type="text" class="form-control" placeholder="รายละเอียดงาน / กิจกรรม" value="${entry.detail}" onchange="window.updateWorklogData('${entry.id}', 'detail', this.value)"></td>
-            <td>
+            <td style="vertical-align: middle;"><input type="text" class="form-control" placeholder="รายละเอียดงาน / กิจกรรม" value="${entry.detail}" onchange="window.updateWorklogData('${entry.id}', 'detail', this.value)"></td>
+            <td style="vertical-align: middle;">
               <select class="form-control" style="color: ${getStatusColor(entry.status)}; font-weight: bold;" onchange="window.updateWorklogData('${entry.id}', 'status', this.value); this.style.color = getStatusColor(this.value)">
-                 <option value="Pending" ${entry.status==='Pending'?'selected':''}>Pending</option>
-                 <option value="Onprocess" ${entry.status==='Onprocess'?'selected':''}>Onprocess</option>
                  <option value="Done" ${entry.status==='Done'?'selected':''}>Done</option>
+                 <option value="Onprocess" ${entry.status==='Onprocess'?'selected':''}>On Process</option>
+                 <option value="Pending" ${entry.status==='Pending'?'selected':''}>Pending</option>
               </select>
             </td>
-            <td><button class="btn-icon text-danger" onclick="removeWorklogEntry('${entry.id}')"><i class="fa-solid fa-trash"></i></button></td>
+            <td style="vertical-align: middle; text-align: center;"><button class="btn-icon text-danger" onclick="removeWorklogEntry('${entry.id}')"><i class="fa-solid fa-trash"></i></button></td>
         `;
         tbody.appendChild(tr);
     });
