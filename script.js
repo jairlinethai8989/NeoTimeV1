@@ -533,31 +533,51 @@ function loadDashLeaveCalendar() {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = new Date();
     
+    // Helper to get leave color
+    function getLeaveColor(leaveType) {
+        if(!leaveType) return '#FF9500';
+        if(leaveType.includes('ป่วย')) return '#FF3B30';
+        if(leaveType.includes('พักร้อน')) return '#007AFF';
+        return '#FF9500'; // ลากิจ
+    }
+    
     let html = '';
     // Blank cells for offset
     for(let i=0; i<firstDay; i++) {
-        html += '<div style="padding:6px; text-align:center;"></div>';
+        html += '<div style="min-height:72px;"></div>';
     }
     
     for(let d=1; d<=daysInMonth; d++) {
         const isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+        const dayOfWeek = new Date(year, month, d).getDay();
+        const isSun = dayOfWeek === 0;
+        const isSat = dayOfWeek === 6;
         const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         
-        // Check if any leave requests match this date
-        let dotHtml = '';
+        // Find all leave requests for this date
         const leaveForDay = myRequestsData.filter(r => 
             r.type === 'leave' && r.status === 'approved' && r.startDate <= dateStr && (r.endDate || r.startDate) >= dateStr
         );
+        
+        let leaveHtml = '';
         if(leaveForDay.length > 0) {
-            const lt = leaveForDay[0].leaveType || '';
-            let dotColor = '#f59e0b';
-            if(lt.includes('ป่วย')) dotColor = '#ef4444';
-            else if(lt.includes('พักร้อน')) dotColor = '#3b82f6';
-            dotHtml = `<div style="width:6px;height:6px;border-radius:50%;background:${dotColor};margin:2px auto 0;"></div>`;
+            leaveForDay.slice(0, 2).forEach(r => {
+                const color = getLeaveColor(r.leaveType);
+                const name = (MOCK_USER?.name || 'พนักงาน').split(' ')[0];
+                leaveHtml += `<div style="font-size:9px; padding:2px 4px; border-radius:4px; background:${color}15; color:${color}; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-left: 2px solid ${color}; margin-top:2px;">${name}</div>`;
+            });
+            if(leaveForDay.length > 2) {
+                leaveHtml += `<div style="font-size:8px; color:var(--text-muted); text-align:center;">+${leaveForDay.length - 2} คน</div>`;
+            }
         }
         
-        html += `<div style="padding:6px; text-align:center; font-size:13px; border-radius:6px; cursor:default; ${isToday ? 'background:var(--primary); color:white; font-weight:bold;' : ''}">
-            ${d}${dotHtml}
+        const todayStyle = isToday 
+            ? 'background: linear-gradient(135deg, #007AFF, #5856D6); color: white; font-weight: 700; border-radius: 12px;' 
+            : `border-radius: 10px; ${isSun ? 'color:#FF3B30;' : ''} ${isSat ? 'color:#007AFF;' : ''}`;
+        
+        html += `<div style="min-height:72px; padding:6px; text-align:center; cursor:default; ${todayStyle} transition: background 0.2s;">
+            <div style="font-size:14px; font-weight:${isToday?'700':'500'}; margin-bottom:2px;">${d}</div>
+            ${leaveHtml}
         </div>`;
     }
     calEl.innerHTML = html;

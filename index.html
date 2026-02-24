@@ -243,33 +243,33 @@
           </div>
         </div>
 
-        <!-- Dashboard Charts and Activity -->
-        <div class="dashboard-content">
-          <div class="dashboard-card" style="flex:2;">
+        <!-- Dashboard: Leave Calendar (Full Width) -->
+        <div class="dashboard-card" style="margin-bottom: 24px;">
             <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
               <h3 class="card-title"><i class="fa-solid fa-calendar-check"></i> ปฏิทินการลาประจำเดือน</h3>
               <div style="display:flex; align-items:center; gap:8px;">
                 <button class="btn-icon" onclick="changeDashLeaveMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
-                <span id="dash-leave-month-label" style="font-weight:600; font-size:14px;">-</span>
+                <span id="dash-leave-month-label" style="font-weight:600; font-size:15px;">-</span>
                 <button class="btn-icon" onclick="changeDashLeaveMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
               </div>
             </div>
-            <div class="card-body" style="padding: 12px;">
-              <div style="display:grid; grid-template-columns: repeat(7, 1fr); text-align:center; font-size: 11px; font-weight: bold; color: var(--text-muted); margin-bottom: 4px;">
-                <div>อา</div><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div>ส</div>
+            <div class="card-body" style="padding: 16px 20px;">
+              <div style="display:grid; grid-template-columns: repeat(7, 1fr); text-align:center; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+                <div style="color:#FF3B30;">อา</div><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div style="color:#007AFF;">ส</div>
               </div>
-              <div id="dash-leave-calendar" style="display:grid; grid-template-columns: repeat(7, 1fr); gap: 2px;">
+              <div id="dash-leave-calendar" style="display:grid; grid-template-columns: repeat(7, 1fr); gap: 4px;">
                 <!-- Rendered by JS -->
               </div>
-              <div style="display:flex; gap:16px; margin-top:12px; font-size:12px; color:var(--text-muted); flex-wrap:wrap;">
-                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#ef4444;vertical-align:middle;margin-right:4px;"></span>ลาป่วย</div>
-                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#f59e0b;vertical-align:middle;margin-right:4px;"></span>ลากิจ</div>
-                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#3b82f6;vertical-align:middle;margin-right:4px;"></span>ลาพักร้อน</div>
+              <div style="display:flex; gap:20px; margin-top:16px; font-size:12px; color:var(--text-muted); flex-wrap:wrap; padding-top:12px; border-top: 1px solid var(--border);">
+                <div><span style="display:inline-block;width:10px;height:10px;border-radius:4px;background:#FF3B30;vertical-align:middle;margin-right:6px;"></span>ลาป่วย</div>
+                <div><span style="display:inline-block;width:10px;height:10px;border-radius:4px;background:#FF9500;vertical-align:middle;margin-right:6px;"></span>ลากิจ</div>
+                <div><span style="display:inline-block;width:10px;height:10px;border-radius:4px;background:#007AFF;vertical-align:middle;margin-right:6px;"></span>ลาพักร้อน</div>
               </div>
             </div>
-          </div>
+        </div>
 
-          <div class="dashboard-card" style="flex:1;">
+        <!-- Dashboard: Mini Map -->
+        <div class="dashboard-card">
             <div class="card-header">
               <h3 class="card-title"><i class="fa-solid fa-map-location-dot"></i> การกระจายตัวหน้างาน (Mini Map)</h3>
             </div>
@@ -279,7 +279,6 @@
                  <button class="btn btn-primary" style="padding: 6px 12px; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="navigateTo('map', document.querySelector('[data-page=map]'))"><i class="fa-solid fa-maximize"></i> ขยายแผนที่หลัก</button>
                </div>
             </div>
-          </div>
         </div>
       </div>
 
