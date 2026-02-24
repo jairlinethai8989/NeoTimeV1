@@ -656,6 +656,7 @@ async function loadUsers() {
             email: u.email,
             username: u.username,
             role: u.role,
+            department: u.department || '',
             shift: u.primary_shift, // Using primary_shift for display
             status: u.status,
             accessible_menus: u.accessible_menus
@@ -715,8 +716,18 @@ function openUserModal() {
     document.getElementById('u-original-id').value = '';
     document.getElementById('user-form').reset();
     
+    // Populate departments from settings
+    const lsSettings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+    const deptSelect = document.getElementById('u-department');
+    if (deptSelect && lsSettings.departments) {
+        const depts = lsSettings.departments.split(',').map(d => d.trim()).filter(d => d);
+        if (depts.length > 0) {
+            deptSelect.innerHTML = '<option value="">-- เลือกแผนก --</option>' + depts.map(d => `<option value="${d}">${d}</option>`).join('');
+        }
+    }
+    
     // Default permissions for new users
-    const defaultPerms = ['dashboard', 'checkin', 'records', 'map', 'shifts', 'my-requests', 'profile'];
+    const defaultPerms = ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
     document.querySelectorAll('input[name="u-perms"]').forEach(cb => {
         cb.checked = defaultPerms.includes(cb.value);
     });
@@ -733,10 +744,22 @@ function editUser(encodedUser) {
     document.getElementById('u-email').value = u.email;
     document.getElementById('u-username').value = u.username;
     document.getElementById('u-role').value = u.role;
-    document.getElementById('u-shift').value = u.shift;
+    
+    // Populate departments and select existing
+    const lsSettings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+    const deptSelect = document.getElementById('u-department');
+    if (deptSelect && lsSettings.departments) {
+        const depts = lsSettings.departments.split(',').map(d => d.trim()).filter(d => d);
+        if (depts.length > 0) {
+            deptSelect.innerHTML = '<option value="">-- เลือกแผนก --</option>' + depts.map(d => `<option value="${d}">${d}</option>`).join('');
+        }
+    }
+    if (document.getElementById('u-department')) document.getElementById('u-department').value = u.department || '';
+    
+    document.getElementById('u-shift').value = u.shift || '';
     document.getElementById('u-status').value = u.status;
     
-    const perms = u.accessible_menus || ['dashboard', 'checkin', 'records', 'map', 'shifts', 'my-requests', 'profile'];
+    const perms = u.accessible_menus || ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
     document.querySelectorAll('input[name="u-perms"]').forEach(cb => {
         cb.checked = perms.includes(cb.value);
     });
@@ -753,6 +776,7 @@ async function saveUser() {
         email: document.getElementById('u-email').value.trim(),
         username: document.getElementById('u-username').value.trim(),
         role: document.getElementById('u-role').value,
+        department: document.getElementById('u-department') ? document.getElementById('u-department').value : null,
         primary_shift: document.getElementById('u-shift').value.trim(),
         status: document.getElementById('u-status').value,
         accessible_menus: selectedPerms
@@ -1567,7 +1591,69 @@ function renderMyRequests(data) {
 function openCreateRequestModal() {
     document.getElementById('create-request-form').reset();
     toggleReqTypeFields();
+    updateLeaveRemainingBalance();
+    
+    // reset total days visual
+    document.getElementById('leave-total-days-group').style.display = 'none';
+    document.getElementById('leave-total-days-value').textContent = '1';
+    
     openModal('create-request-modal');
+}
+
+function updateLeaveRemainingBalance() {
+    const lsSettings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+    const type = document.getElementById('req-leave-type').value;
+    let limit = 0;
+    if(type === 'ลาป่วย') limit = lsSettings.leaveSick !== undefined ? parseInt(lsSettings.leaveSick) : 30;
+    if(type === 'ลากิจ') limit = lsSettings.leavePersonal !== undefined ? parseInt(lsSettings.leavePersonal) : 6;
+    if(type === 'ลาพักร้อน') limit = lsSettings.leaveVacation !== undefined ? parseInt(lsSettings.leaveVacation) : 6;
+    
+    // In a real app we would subtract the taken days from the user's DB. We mock it here.
+    const used = 0; 
+    const remain = limit - used;
+    
+    document.getElementById('leave-balance-display').textContent = `สิทธิ์คงเหลือ: ${remain} วัน (รอใช้งาน: ${used} วัน)`;
+}
+
+function updateLeaveDatesLogic() {
+    const duration = document.getElementById('req-leave-duration').value;
+    const endDateGroup = document.getElementById('leave-date-end-group');
+    const totalDaysGroup = document.getElementById('leave-total-days-group');
+    
+    if(duration !== 'full') {
+         // Half day -> end date is the same as start date automatically, and hide end date
+         endDateGroup.style.display = 'none';
+         totalDaysGroup.style.display = 'block';
+         document.getElementById('leave-total-days-value').textContent = '0.5';
+         document.getElementById('req-end-date').value = document.getElementById('req-start-date').value;
+    } else {
+         endDateGroup.style.display = 'block';
+         calculateLeaveDays();
+    }
+}
+
+function calculateLeaveDays() {
+    const duration = document.getElementById('req-leave-duration')?.value;
+    if (duration !== 'full') return; // Fixed to 0.5
+    
+    const s = document.getElementById('req-start-date').value;
+    const e = document.getElementById('req-end-date').value;
+    const totalDaysGroup = document.getElementById('leave-total-days-group');
+    
+    if(s && e) {
+        const d1 = new Date(s);
+        const d2 = new Date(e);
+        if(d2 >= d1) {
+             const diffTime = Math.abs(d2 - d1);
+             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+             totalDaysGroup.style.display = 'block';
+             document.getElementById('leave-total-days-value').textContent = diffDays;
+        } else {
+             totalDaysGroup.style.display = 'none';
+        }
+    } else {
+        totalDaysGroup.style.display = 'none';
+    }
 }
 
 function toggleReqTypeFields() {
@@ -1602,7 +1688,13 @@ function submitMyRequest() {
 
     if (type === 'leave') {
         newReq.leaveType = document.getElementById('req-leave-type').value;
-        newReq.endDate = document.getElementById('req-end-date').value || startDate;
+        newReq.leaveDuration = document.getElementById('req-leave-duration').value;
+        
+        if(newReq.leaveDuration !== 'full') {
+            newReq.endDate = startDate;
+        } else {
+            newReq.endDate = document.getElementById('req-end-date').value || startDate;
+        }
     } else {
         newReq.otStart = document.getElementById('req-ot-start').value;
         newReq.otEnd = document.getElementById('req-ot-end').value;
@@ -2646,6 +2738,11 @@ function loadSystemSettings() {
     if (lsSettings.lateGrace && document.getElementById('st-late-grace')) document.getElementById('st-late-grace').value = lsSettings.lateGrace;
     if (lsSettings.wifi && document.getElementById('st-wifi')) document.getElementById('st-wifi').value = lsSettings.wifi;
     if (lsSettings.photo && document.getElementById('st-photo')) document.getElementById('st-photo').value = lsSettings.photo;
+    
+    if (lsSettings.leaveSick !== undefined && document.getElementById('st-leave-sick')) document.getElementById('st-leave-sick').value = lsSettings.leaveSick;
+    if (lsSettings.leavePersonal !== undefined && document.getElementById('st-leave-personal')) document.getElementById('st-leave-personal').value = lsSettings.leavePersonal;
+    if (lsSettings.leaveVacation !== undefined && document.getElementById('st-leave-vacation')) document.getElementById('st-leave-vacation').value = lsSettings.leaveVacation;
+    if (lsSettings.departments && document.getElementById('st-departments')) document.getElementById('st-departments').value = lsSettings.departments;
 }
 
 function saveSystemSettings() {
@@ -2664,7 +2761,11 @@ function saveSystemSettings() {
             lateGrace: document.getElementById('st-late-grace')?.value,
             wifi: document.getElementById('st-wifi')?.value,
             photo: document.getElementById('st-photo')?.value,
-            themeMode: document.getElementById('st-theme-mode')?.value
+            themeMode: document.getElementById('st-theme-mode')?.value,
+            departments: document.getElementById('st-departments')?.value,
+            leaveSick: document.getElementById('st-leave-sick')?.value,
+            leavePersonal: document.getElementById('st-leave-personal')?.value,
+            leaveVacation: document.getElementById('st-leave-vacation')?.value
         };
 
         const logoPreview = document.getElementById('st-logo-preview');

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบเช็คชื่อพนักงาน - Time Attendance</title>
+  <title>Neo Work Life - ระบบจัดการเวลาเข้างาน</title>
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -34,12 +34,12 @@
   </button>
 
   <!-- ═══ SIDEBAR ═══ -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <div class="logo"><i class="fa-solid fa-mountain-sun"></i></div>
+  <aside class="sidebar" id="sidebar" style="background-color: #1e293b; color: #f8fafc; border-right: none;">
+    <div class="sidebar-header" style="border-bottom: 1px solid #334155;">
+      <div class="logo" style="background-color: var(--primary);"><i class="fa-solid fa-clock"></i></div>
       <div class="title">
-        <h2>ระบบเข้า ออกงาน</h2>
-        <p>TIME ATTENDANCE</p>
+        <h2 style="color: #f8fafc;">Neo Work Life</h2>
+        <p style="color: #94a3b8;">TIME ATTENDANCE</p>
       </div>
     </div>
 
@@ -120,8 +120,6 @@
         <div class="nav-children">
           <a class="nav-child" data-page="users" onclick="navigateTo('users', this, true)">จัดการผู้ใช้</a>
           <a class="nav-child" data-page="workplaces" onclick="navigateTo('workplaces', this, true)">จัดการหน้างาน</a>
-          <a class="nav-child" data-page="auto-escalation"
-            onclick="navigateTo('auto-escalation', this, true)">Auto-Escalation</a>
           <a class="nav-child" data-page="settings" onclick="navigateTo('settings', this, true)">ตั้งค่าระบบ</a>
         </div>
       </div>
@@ -844,11 +842,6 @@
         </div>
       </div>
 
-      <!-- Page: Auto-Escalation (wip) -->
-      <div class="page-content" id="page-auto-escalation">
-        <div class="placeholder-box">
-          <h2><i class="fa-solid fa-clock-rotate-left"></i> Auto-Escalation</h2>
-          <p>This module will be built in the next phases.</p>
         </div>
       </div>
 
@@ -890,6 +883,30 @@
                 <option value="optional" selected>ไม่บังคับ (เลือกใช้งานสำหรับบางไซต์)</option>
                 <option value="always">บังคับทุกไซต์งาน</option>
               </select>
+            </div>
+            
+            <h3 class="card-title" style="margin-top: 24px;"><i class="fa-solid fa-calendar-check"></i> สิทธิ์วันลาต่อปี</h3>
+            <div style="display: flex; gap: 12px; margin-bottom: 8px;">
+              <div class="form-group" style="flex:1;">
+                <label>ลาป่วย (วัน)</label>
+                <input type="number" class="form-control" id="st-leave-sick" value="30" min="0">
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>ลากิจ (วัน)</label>
+                <input type="number" class="form-control" id="st-leave-personal" value="6" min="0">
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>ลาพักร้อน (วัน)</label>
+                <input type="number" class="form-control" id="st-leave-vacation" value="6" min="0">
+              </div>
+            </div>
+          </div>
+          
+          <div class="card p-24">
+            <h3 class="card-title"><i class="fa-solid fa-building-user"></i> ตั้งค่าองค์กร</h3>
+            <div class="form-group mb-16">
+              <label>แผนก / ฝ่าย (คั่นด้วยลูกน้ำ ",")</label>
+              <textarea id="st-departments" class="form-control" rows="2" placeholder="ไอที, บัญชี, ฝ่ายขาย, ฝ่ายบุคคล"></textarea>
             </div>
           </div>
           
@@ -1033,14 +1050,12 @@
                 <div class="form-group" style="grid-column: 1 / -1; margin-top: 12px;">
                   <label>ลายเซ็นอิเล็กทรอนิกส์</label>
                   <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: start; background: var(--bg-main); padding: 16px; border-radius: 8px;">
-                     <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; background: white; border: 1px dashed var(--border); border-radius: 8px;">
+                     <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; background: white; border: 1px dashed var(--border); border-radius: 8px; position: relative;">
                       <img id="saved-signature-preview" src="" style="max-width: 100%; max-height: 80px; display: none;" alt="Saved Signature">
                       <p id="no-signature-text" class="text-muted" style="font-size: 13px; margin: 0 0 12px 0;">ยังไม่มีลายเซ็นในระบบ</p>
-                      <button type="button" class="btn btn-outline" onclick="openSignatureModal()"><i class="fa-solid fa-pen-nib"></i> จัดการลายเซ็นของฉัน</button>
+                      <button type="button" class="btn btn-outline" style="z-index: 10;" onclick="openSignatureModal()"><i class="fa-solid fa-pen-nib"></i> จัดการลายเซ็นของฉัน</button>
                     </div>
                   </div>
-                  <input type="hidden" id="prof-signature_base64">
-                </div>
                   <input type="hidden" id="prof-signature_base64">
                 </div>
 
@@ -1101,6 +1116,16 @@
               </select>
             </div>
             <div class="form-group mb-16">
+              <label>แผนก/ฝ่าย</label>
+              <select id="u-department" class="form-control">
+                <option value="">-- เลือกแผนก --</option>
+                <option value="ไอที">ไอที</option>
+                <option value="บัญชี">บัญชี</option>
+                <option value="ฝ่ายขาย">ฝ่ายขาย</option>
+                <option value="ฝ่ายบุคคล">ฝ่ายบุคคล</option>
+              </select>
+            </div>
+            <div class="form-group mb-16">
               <label>สาขาหลัก (กะงาน)</label>
               <input type="text" id="u-shift" class="form-control" placeholder="สำนักงานใหญ่, สาขาเชียงใหม่...">
             </div>
@@ -1118,6 +1143,7 @@
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="checkin" checked> เช็คอิน/เช็คเอาท์</label>
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="records" checked> บันทึกการเข้างาน</label>
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="map" checked> แผนที่</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="worklog" checked> บันทึกการทำงาน</label>
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="shifts" checked> ดูตารางกะงาน</label>
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="manage-shifts"> จัดตารางกะงาน</label>
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="my-requests" checked> รายการคำขอ</label>
@@ -1128,7 +1154,6 @@
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="audit-log"> Audit Log</label>
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="users"> จัดการผู้ใช้</label>
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="workplaces"> จัดการหน้างาน</label>
-                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="auto-escalation"> Auto-Escalation</label>
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="settings"> ตั้งค่าระบบ</label>
               </div>
             </div>
@@ -1293,21 +1318,33 @@
             <div id="leave-fields">
               <div class="form-group mb-16">
                 <label>ประเภทการลา <span class="text-danger">*</span></label>
-                <select id="req-leave-type" class="form-control">
-                  <option value="ลาป่วย">ลาป่วย</option>
-                  <option value="ลากิจ">ลากิจ</option>
-                  <option value="ลาพักร้อน">ลาพักร้อน</option>
-                </select>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <select id="req-leave-type" class="form-control" style="flex: 2; min-width: 120px;" onchange="updateLeaveRemainingBalance()">
+                    <option value="ลาป่วย">ลาป่วย</option>
+                    <option value="ลากิจ">ลากิจ</option>
+                    <option value="ลาพักร้อน">ลาพักร้อน</option>
+                  </select>
+                  <select id="req-leave-duration" class="form-control" style="flex: 1; min-width: 140px;" onchange="updateLeaveDatesLogic()">
+                    <option value="full">เต็มวัน</option>
+                    <option value="morning">ครึ่งวัน (เช้า)</option>
+                    <option value="afternoon">ครึ่งวัน (บ่าย)</option>
+                  </select>
+                </div>
+                <small id="leave-balance-display" class="text-primary mt-2" style="display: block; margin-top: 6px;">สิทธิ์คงเหลือ: - วัน</small>
               </div>
             </div>
 
-            <div class="form-group mb-16">
+            <div class="form-group mb-16" id="leave-date-start-group">
               <label>วันที่เริ่มต้น <span class="text-danger">*</span></label>
-              <input type="date" id="req-start-date" class="form-control" required>
+              <input type="date" id="req-start-date" class="form-control" required onchange="calculateLeaveDays()">
             </div>
-            <div class="form-group mb-16">
+            <div class="form-group mb-16" id="leave-date-end-group">
               <label>วันที่สิ้นสุด <span class="text-danger">*</span></label>
-              <input type="date" id="req-end-date" class="form-control" required>
+              <input type="date" id="req-end-date" class="form-control" required onchange="calculateLeaveDays()">
+            </div>
+            
+            <div class="form-group mb-16" id="leave-total-days-group" style="display: none; background: #eff6ff; padding: 12px; border-radius: 6px; border: 1px dashed var(--primary);">
+                <label style="color: var(--primary); font-weight: bold; margin-bottom: 0;">รวมจำนวนวันลา: <span id="leave-total-days-value">1</span> วัน</label>
             </div>
 
             <div id="ot-fields" style="display:none;">
