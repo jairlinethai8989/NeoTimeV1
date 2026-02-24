@@ -482,6 +482,60 @@ function closeModal(id) { document.getElementById(id).classList.remove('active')
 // ─── DASHBOARD (B4) ──────────────────────────────────
 function loadDashboard() {
     fetchDashboardStats();
+    initDashMiniMap();
+    updateApprovalBadges();
+}
+
+let miniDashMap = null;
+function initDashMiniMap() {
+    const mapContainer = document.getElementById('dash-mini-map');
+    if (!mapContainer) return;
+    if (miniDashMap) return;
+    
+    // Check if L is loaded
+    if(typeof L === 'undefined') return;
+
+    miniDashMap = L.map('dash-mini-map', {
+        zoomControl: false,
+        attributionControl: false
+    }).setView([13.7563, 100.5018], 10);
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+    }).addTo(miniDashMap);
+    
+    // Appending simple markers
+    L.marker([13.7563, 100.5018]).addTo(miniDashMap).bindPopup("สำนักงานใหญ่ (HQ)");
+    L.marker([13.8, 100.6]).addTo(miniDashMap).bindPopup("สาขาลาดพร้าว");
+    L.marker([13.7, 100.4]).addTo(miniDashMap).bindPopup("ไซท์งาน A");
+    
+    setTimeout(() => {
+        miniDashMap.invalidateSize();
+    }, 400);
+}
+
+function updateApprovalBadges() {
+    // Mock counts based on sample data size
+    const otCount = 2; // For mock purpose
+    const leaveCount = 3; 
+    const total = otCount + leaveCount;
+    
+    const badgeTotal = document.getElementById('nav-badge-approve-total');
+    const badgeOT = document.getElementById('nav-badge-approve-ot');
+    const badgeLeave = document.getElementById('nav-badge-approve-leave');
+    
+    if (badgeTotal) {
+        badgeTotal.textContent = total;
+        badgeTotal.style.display = total > 0 ? 'inline-block' : 'none';
+    }
+    if (badgeOT) {
+        badgeOT.textContent = otCount;
+        badgeOT.style.display = otCount > 0 ? 'inline-block' : 'none';
+    }
+    if (badgeLeave) {
+        badgeLeave.textContent = leaveCount;
+        badgeLeave.style.display = leaveCount > 0 ? 'inline-block' : 'none';
+    }
 }
 
 async function fetchDashboardStats() {
@@ -2723,22 +2777,64 @@ function clearSettingsImage(type) {
 // ─── WORKLOG / TIMESHEET ─────────────────────────────────
 let worklogEntries = [];
 let wlCounter = 0;
+let wlCurrentDate = new Date();
+let wlViewMode = 'daily';
+
+function changeWorklogView() {
+    const modeEl = document.getElementById('wl-view-mode');
+    if(modeEl) wlViewMode = modeEl.value;
+    updateWorklogDateDisplay();
+    renderWorklog();
+}
+
+function changeWorklogPeriod(dir) {
+    if(wlViewMode === 'daily') {
+        wlCurrentDate.setDate(wlCurrentDate.getDate() + dir);
+    } else if(wlViewMode === 'weekly') {
+        wlCurrentDate.setDate(wlCurrentDate.getDate() + (dir * 7));
+    } else if(wlViewMode === 'monthly') {
+        wlCurrentDate.setMonth(wlCurrentDate.getMonth() + dir);
+    }
+    updateWorklogDateDisplay();
+    renderWorklog();
+}
+
+function updateWorklogDateDisplay() {
+    const dOpts = { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok' };
+    const wOpts = { year: 'numeric', month: 'long', timeZone: 'Asia/Bangkok' };
+    let text = '';
+    if(wlViewMode === 'daily') {
+        text = wlCurrentDate.toLocaleDateString('th-TH', dOpts);
+    } else if(wlViewMode === 'weekly') {
+        const d1 = new Date(wlCurrentDate);
+        d1.setDate(d1.getDate() - d1.getDay() + 1); // Monday
+        const d2 = new Date(d1);
+        d2.setDate(d1.getDate() + 6); // Sunday
+        text = d1.toLocaleDateString('th-TH', {day:'numeric', month:'short'}) + ' - ' + d2.toLocaleDateString('th-TH', {day:'numeric', month:'short', year:'numeric'});
+    } else if(wlViewMode === 'monthly') {
+        text = wlCurrentDate.toLocaleDateString('th-TH', wOpts);
+    }
+    
+    const displayEl = document.getElementById('wl-current-date');
+    if(displayEl) displayEl.textContent = text;
+}
 
 function loadWorklogPage() {
-    const dOpts = { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok' };
-    document.getElementById('wl-current-date').textContent = new Date().toLocaleDateString('th-TH', dOpts);
+    wlCurrentDate = new Date();
+    const modeEl = document.getElementById('wl-view-mode');
+    if(modeEl) modeEl.value = wlViewMode;
+    updateWorklogDateDisplay();
     
-    // Load existing drafts from local storage (mock API call)
     try {
         const drafts = JSON.parse(localStorage.getItem('myWorklog_' + (MOCK_USER?.uuid || '')));
-        if(drafts && drafts.date === new Date().toISOString().split('T')[0]) {
-            worklogEntries = drafts.entries || [];
-            wlCounter = drafts.entries.length;
+        // Load them all or filter based on view mode? 
+        // For mock simple logic we just load all saved drafts.
+        if(drafts && drafts.entries && drafts.entries.length > 0) {
+            worklogEntries = drafts.entries;
+            wlCounter = drafts.entries.map(e => parseInt(e.id.split('_')[1]||0)).reduce((a,b)=>Math.max(a,b), 0);
         } else {
-            // New day, clear current lists
             worklogEntries = [];
             wlCounter = 0;
-            // Pre-fill one row based on check-in time
             addWorklogEntry();
         }
     } catch(e) {
@@ -2754,9 +2850,11 @@ function addWorklogEntry() {
     wlCounter++;
     worklogEntries.push({
         id: 'wl_' + wlCounter,
-        timeRange: '09:00 - 18:00',
+        date: wlViewMode === 'daily' ? wlCurrentDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        startTime: '09:00',
+        endTime: '18:00',
         detail: '',
-        progress: '100'
+        status: 'Pending'
     });
     renderWorklog();
 }
@@ -2776,26 +2874,54 @@ function updateWorklogData(id, field, value) {
 // Global exposure for innerHTML handlers
 window.updateWorklogData = updateWorklogData;
 
+function getStatusColor(st) {
+    if(st === 'Done') return 'var(--success)';
+    if(st === 'Onprocess') return 'var(--warning)';
+    return 'var(--text-muted)';
+}
+
 function renderWorklog() {
     const tbody = document.getElementById('worklog-tbody');
     if(!tbody) return;
     tbody.innerHTML = '';
     
+    // Filter display entries based on current view/date (Simple mock filter via matches)
+    // Real implementation would filter based on Date range
+    
     if(worklogEntries.length === 0) {
-       tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;" class="text-muted">ไม่พบรายการบันทึกการทำงาน กรุณาเพิ่มรายการ</td></tr>';
+       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;" class="text-muted">ไม่พบรายการบันทึกการทำงาน กรุณาเพิ่มรายการ</td></tr>';
        return;
+    }
+    
+    const colDate = document.querySelector('.wl-col-date');
+    if(colDate) {
+        colDate.style.display = wlViewMode === 'daily' ? 'none' : '';
     }
     
     worklogEntries.forEach(entry => {
         const tr = document.createElement('tr');
+        
+        let dateHtml = '';
+        if(wlViewMode !== 'daily') {
+             dateHtml = `<td><input type="date" class="form-control" value="${entry.date}" onchange="window.updateWorklogData('${entry.id}', 'date', this.value)"></td>`;
+        }
+        
         tr.innerHTML = `
-            <td><input type="text" class="form-control" placeholder="09:00 - 18:00" value="${entry.timeRange}" onchange="window.updateWorklogData('${entry.id}', 'timeRange', this.value)"></td>
-            <td><input type="text" class="form-control" placeholder="รายละเอียดงาน / กิจกรรม" value="${entry.detail}" onchange="window.updateWorklogData('${entry.id}', 'detail', this.value)"></td>
+            ${dateHtml}
             <td>
               <div style="display:flex; align-items:center; gap:8px;">
-                <input type="number" class="form-control" placeholder="100" min="0" max="100" value="${entry.progress}" onchange="window.updateWorklogData('${entry.id}', 'progress', this.value)">
-                <span>%</span>
+                <input type="time" class="form-control" style="padding: 6px;" value="${entry.startTime}" onchange="window.updateWorklogData('${entry.id}', 'startTime', this.value)">
+                <span>-</span>
+                <input type="time" class="form-control" style="padding: 6px;" value="${entry.endTime}" onchange="window.updateWorklogData('${entry.id}', 'endTime', this.value)">
               </div>
+            </td>
+            <td><input type="text" class="form-control" placeholder="รายละเอียดงาน / กิจกรรม" value="${entry.detail}" onchange="window.updateWorklogData('${entry.id}', 'detail', this.value)"></td>
+            <td>
+              <select class="form-control" style="color: ${getStatusColor(entry.status)}; font-weight: bold;" onchange="window.updateWorklogData('${entry.id}', 'status', this.value); this.style.color = getStatusColor(this.value)">
+                 <option value="Pending" ${entry.status==='Pending'?'selected':''}>Pending</option>
+                 <option value="Onprocess" ${entry.status==='Onprocess'?'selected':''}>Onprocess</option>
+                 <option value="Done" ${entry.status==='Done'?'selected':''}>Done</option>
+              </select>
             </td>
             <td><button class="btn-icon text-danger" onclick="removeWorklogEntry('${entry.id}')"><i class="fa-solid fa-trash"></i></button></td>
         `;
@@ -2805,11 +2931,9 @@ function renderWorklog() {
 
 function saveWorklogDraft() {
     confirmAction('ยืนยันการบันทึกรายการทำงานทั้งหมด?', '', () => {
-        const todayDate = new Date().toISOString().split('T')[0];
         try {
             if(MOCK_USER && MOCK_USER.uuid) {
                localStorage.setItem('myWorklog_' + MOCK_USER.uuid, JSON.stringify({
-                   date: todayDate,
                    entries: worklogEntries
                }));
             }
@@ -2827,13 +2951,15 @@ function exportWorklog() {
     }
     
     let csv = '\\uFEFF'; 
-    csv += 'เวลาเริ่ม-สิ้นสุด,รายละเอียดการทำงาน,ความคืบหน้า(%)\\n';
+    csv += 'วันที่,เวลาเริ่ม,เวลาสิ้นสุด,รายละเอียดการทำงาน,สถานะ\\n';
     
     worklogEntries.forEach(e => {
-        const time = `"${e.timeRange.replace(/"/g, '""')}"`;
-        const detail = `"${e.detail.replace(/"/g, '""')}"`;
-        const prog = `"${e.progress}"`;
-        csv += `${time},${detail},${prog}\\n`;
+        const d = `"${e.date}"`;
+        const stTime = `"${e.startTime}"`;
+        const enTime = `"${e.endTime}"`;
+        const detail = `"${(e.detail||'').replace(/"/g, '""')}"`;
+        const st = `"${e.status}"`;
+        csv += `${d},${stTime},${enTime},${detail},${st}\\n`;
     });
     
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

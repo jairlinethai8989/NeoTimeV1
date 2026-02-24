@@ -88,14 +88,14 @@
 
       <div class="nav-group">
         <a class="nav-item nav-has-child" onclick="toggleNavGroup(this)">
-          <div class="nav-item-content"><i class="fa-regular fa-circle-check"></i> <span>อนุมัติ</span></div>
+          <div class="nav-item-content"><i class="fa-regular fa-circle-check"></i> <span>อนุมัติ <span id="nav-badge-approve-total" class="badge badge-danger" style="display:none; padding:2px 6px; font-size:10px; margin-left: 6px;">0</span></span></div>
           <i class="fa-solid fa-chevron-down nav-arrow"></i>
         </a>
         <div class="nav-children">
           <a class="nav-child" data-page="approve-requests"
-            onclick="navigateTo('approve-requests', this, true)">อนุมัติคำขอ</a>
+            onclick="navigateTo('approve-requests', this, true)">อนุมัติคำขอ <span id="nav-badge-approve-ot" class="badge badge-danger" style="display:none; padding:2px 6px; font-size:10px; margin-left: auto;">0</span></a>
           <a class="nav-child" data-page="approve-leave"
-            onclick="navigateTo('approve-leave', this, true)">อนุมัติการลา</a>
+            onclick="navigateTo('approve-leave', this, true)">อนุมัติการลา <span id="nav-badge-approve-leave" class="badge badge-danger" style="display:none; padding:2px 6px; font-size:10px; margin-left: auto;">0</span></a>
         </div>
       </div>
 
@@ -206,6 +206,45 @@
           </div>
         </div>
 
+        <!-- Secondary Stat Grid: Leaves -->
+        <div class="stat-grid" style="margin-top: 16px;">
+          <div class="stat-card">
+            <div class="stat-icon bg-info-light text-info"><i class="fa-solid fa-file-contract"></i></div>
+            <div class="stat-info">
+              <h3>ลางานรวม</h3>
+              <div class="stat-val" id="dash-leave-total">12</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon bg-warning-light text-warning"><i class="fa-solid fa-briefcase"></i></div>
+            <div class="stat-info">
+              <h3>ลากิจ</h3>
+              <div class="stat-val" id="dash-leave-personal">5</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon bg-danger-light text-danger"><i class="fa-solid fa-bed"></i></div>
+            <div class="stat-info">
+              <h3>ลาป่วย</h3>
+              <div class="stat-val" id="dash-leave-sick">3</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon bg-primary-light text-primary"><i class="fa-solid fa-umbrella-beach"></i></div>
+            <div class="stat-info">
+              <h3>ลาพักร้อน</h3>
+              <div class="stat-val" id="dash-leave-vacation">4</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon bg-success-light text-success"><i class="fa-solid fa-truck-fast"></i></div>
+            <div class="stat-info">
+              <h3>ทำงานนอกพื้นที่</h3>
+              <div class="stat-val" id="dash-offsite">18</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Dashboard Charts and Activity -->
         <div class="dashboard-content">
           <div class="dashboard-card" style="flex:1;">
@@ -233,18 +272,13 @@
 
           <div class="dashboard-card" style="flex:1;">
             <div class="card-header">
-              <h3 class="card-title"><i class="fa-solid fa-map-location-dot"></i> การกระจายตัวหน้างาน</h3>
+              <h3 class="card-title"><i class="fa-solid fa-map-location-dot"></i> การกระจายตัวหน้างาน (Mini Map)</h3>
             </div>
-            <div class="card-body" style="padding:0;">
-              <!-- Mock Map Report -->
-              <div class="mock-map-report">
-                <div class="map-overlay">
-                  <h4><i class="fa-solid fa-building"></i> 5 สาขาปฏิบัติงาน</h4>
-                  <p>มีพนักงานกระจายตัวอยู่ในพื้นที่ครบถ้วน</p>
-                  <button class="btn btn-primary" onclick="navigateTo('map', null)"><i class="fa-solid fa-map"></i>
-                    ดูแผนที่แบบเต็ม</button>
-                </div>
-              </div>
+            <div class="card-body" style="padding:0; position: relative; overflow: hidden; border-bottom-left-radius: var(--radius-lg); border-bottom-right-radius: var(--radius-lg);">
+               <div id="dash-mini-map" style="width: 100%; height: 260px; z-index: 1;"></div>
+               <div style="position: absolute; bottom: 12px; right: 12px; z-index: 2;">
+                  <button class="btn btn-primary" style="padding: 6px 12px; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="navigateTo('map', document.querySelector('[data-page=map]'))"><i class="fa-solid fa-maximize"></i> ขยายแผนที่หลัก</button>
+               </div>
             </div>
           </div>
         </div>
@@ -900,18 +934,32 @@
         </div>
 
         <div class="card p-24">
-            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                <h3 class="card-title" style="margin: 0;"><i class="fa-solid fa-clipboard-list"></i> รายการบันทึกการทำงานของวันที่ <span id="wl-current-date">...</span></h3>
-                <button class="btn btn-outline" onclick="addWorklogEntry()"><i class="fa-solid fa-plus"></i> เพิ่มรายการงาน</button>
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <h3 class="card-title" style="margin: 0;"><i class="fa-solid fa-clipboard-list"></i> ข้อมูลบันทึกการทำงาน</h3>
+                    <select id="wl-view-mode" class="form-control" style="width: 140px;" onchange="changeWorklogView()">
+                        <option value="daily">แสดงประจำวัน</option>
+                        <option value="weekly">แสดงประจำสัปดาห์</option>
+                        <option value="monthly">แสดงประจำเดือน</option>
+                    </select>
+                </div>
+                <!-- Controls for navigating periods -->
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <button class="btn-icon" onclick="changeWorklogPeriod(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span id="wl-current-date" style="font-weight: 600;">...</span>
+                    <button class="btn-icon" onclick="changeWorklogPeriod(1)"><i class="fa-solid fa-chevron-right"></i></button>
+                    <button class="btn btn-outline" style="margin-left: 12px;" onclick="addWorklogEntry()"><i class="fa-solid fa-plus"></i> เพิ่มรายการงาน</button>
+                </div>
             </div>
             
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th style="width: 140px;">เวลาเริ่ม - สิ้นสุด</th>
+                            <th style="width: 120px;" class="wl-col-date">วันที่</th>
+                            <th style="width: 200px;">เวลาเริ่ม - เวลาสิ้นสุด</th>
                             <th>รายละเอียดการทำงาน / โปรเจกต์ <span class="text-danger">*</span></th>
-                            <th style="width: 150px;">ความคืบหน้า (%)</th>
+                            <th style="width: 140px;">สถานะงาน</th>
                             <th style="width: 80px;">จัดการ</th>
                         </tr>
                     </thead>
