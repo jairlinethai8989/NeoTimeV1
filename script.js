@@ -1340,22 +1340,59 @@ function removeEmpFromShift(empIdx) {
 }
 
 function addEmployeeToShiftTable() {
-    let usersList = usersData.map(u => u.name).filter(n => n);
-    if(usersList.length === 0) usersList = ['สมชาย ใจดี', 'สุดา รักดี', 'วินัย มั่นคง'];
+    const list = document.getElementById('shift-emp-checkbox-list');
+    document.getElementById('shift-emp-search').value = '';
 
-    const pick = prompt("กรุณาระบุชื่อพนักงานที่ต้องการเพิ่มลงในตารางกะ:\\n" + usersList.join(", "));
-    if(!pick) return;
-
-    // Check if exists
-    if(manualShiftData.find(e => e.empName === pick)) {
-         return alert("พนักงานคนนี้อยู่ในตารางแล้ว");
+    let usersList = usersData.filter(u => u.name && u.status !== 'ปิดการใช้งาน');
+    if(usersList.length === 0) {
+        list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-muted);"><i class="fa-solid fa-user-slash" style="font-size:24px; margin-bottom:8px;"></i><p>ยังไม่มีพนักงานในระบบ กรุณาเพิ่มพนักงานที่หน้า "จัดการผู้ใช้" ก่อน</p></div>';
+        openModal('shift-emp-picker-modal');
+        return;
     }
 
-    const daysInMon = new Date(currentManageMonth.getFullYear(), currentManageMonth.getMonth() + 1, 0).getDate();
-    manualShiftData.push({
-        empName: pick,
-        shifts: Array(daysInMon).fill('O')
+    const alreadyInTable = manualShiftData.map(e => e.empName);
+
+    list.innerHTML = usersList.map(u => {
+        const isAlready = alreadyInTable.includes(u.name);
+        return `
+            <label class="shift-emp-item" style="display:flex; align-items:center; gap:12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: ${isAlready ? 'not-allowed' : 'pointer'}; opacity: ${isAlready ? '0.5' : '1'}; background: ${isAlready ? '#f1f5f9' : 'white'};" data-name="${u.name}">
+                <input type="checkbox" value="${u.name}" ${isAlready ? 'disabled checked' : ''} style="width:18px; height:18px; accent-color: var(--primary);">
+                <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&color=fff&background=3b82f6&size=32" style="width:32px; height:32px; border-radius: 50%;" alt="">
+                <div style="flex:1;">
+                    <div style="font-weight:600; font-size:14px;">${u.name}</div>
+                    <div style="font-size:11px; color:var(--text-muted);">${u.empId || ''} ${u.department ? ' · ' + u.department : ''}</div>
+                </div>
+                ${isAlready ? '<span class="badge badge-info" style="font-size:10px;">อยู่ในตาราง</span>' : ''}
+            </label>
+        `;
+    }).join('');
+
+    openModal('shift-emp-picker-modal');
+}
+
+function filterShiftEmpPicker() {
+    const q = (document.getElementById('shift-emp-search').value || '').toLowerCase();
+    document.querySelectorAll('#shift-emp-checkbox-list .shift-emp-item').forEach(item => {
+        const name = item.getAttribute('data-name').toLowerCase();
+        item.style.display = name.includes(q) ? 'flex' : 'none';
     });
+}
+
+function confirmShiftEmpPicker() {
+    const checked = document.querySelectorAll('#shift-emp-checkbox-list input[type="checkbox"]:checked:not(:disabled)');
+    if(checked.length === 0) return alert('กรุณาเลือกพนักงานอย่างน้อย 1 คน');
+
+    const daysInMon = new Date(currentManageMonth.getFullYear(), currentManageMonth.getMonth() + 1, 0).getDate();
+    checked.forEach(cb => {
+        if(!manualShiftData.find(e => e.empName === cb.value)) {
+            manualShiftData.push({
+                empName: cb.value,
+                shifts: Array(daysInMon).fill('O')
+            });
+        }
+    });
+
+    closeModal('shift-emp-picker-modal');
     renderManageShiftsTable();
 }
 
@@ -1435,8 +1472,12 @@ function generateAIShifts() {
         // AI populating the manual table data
         const daysInMon = new Date(currentManageMonth.getFullYear(), currentManageMonth.getMonth() + 1, 0).getDate();
         
-        let emps = usersData.map(u => u.name).filter(n => n);
-        if(emps.length === 0) emps = ['สมชาย ใจดี', 'สุดา รักดี', 'วินัย มั่นคง'];
+        let emps = usersData.filter(u => u.name && u.status !== 'ปิดการใช้งาน').map(u => u.name);
+        if(emps.length === 0) {
+            alert('ยังไม่มีพนักงานในระบบ กรุณาเพิ่มพนักงานที่หน้า "จัดการผู้ใช้" ก่อน');
+            renderManageShiftsTable();
+            return;
+        }
 
         manualShiftData = emps.map(emp => {
             const shifts = [];
@@ -1761,6 +1802,20 @@ function submitMyRequest() {
             newReq.endDate = startDate;
         } else {
             newReq.endDate = document.getElementById('req-end-date').value || startDate;
+        }
+
+        // Validate consecutive leave days
+        const lsSettings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+        const maxConsecutive = parseInt(lsSettings.leaveMaxConsecutive) || 0;
+        if(maxConsecutive > 0) {
+            const d1 = new Date(newReq.startDate);
+            const d2 = new Date(newReq.endDate);
+            const diffMs = Math.abs(d2 - d1);
+            const totalDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+            if(totalDays > maxConsecutive) {
+                alert(`ไม่สามารถลาต่อเนื่องเกิน ${maxConsecutive} วันได้\nคุณขอลา ${totalDays} วัน ซึ่งเกินสิทธิ์ตามที่ระบบกำหนดไว้ กรุณาปรับจำนวนวันลา`);
+                return;
+            }
         }
     } else {
         newReq.otStart = document.getElementById('req-ot-start').value;
@@ -2788,6 +2843,7 @@ function loadSystemSettings() {
     if (lsSettings.leaveSick !== undefined && document.getElementById('st-leave-sick')) document.getElementById('st-leave-sick').value = lsSettings.leaveSick;
     if (lsSettings.leavePersonal !== undefined && document.getElementById('st-leave-personal')) document.getElementById('st-leave-personal').value = lsSettings.leavePersonal;
     if (lsSettings.leaveVacation !== undefined && document.getElementById('st-leave-vacation')) document.getElementById('st-leave-vacation').value = lsSettings.leaveVacation;
+    if (lsSettings.leaveMaxConsecutive !== undefined && document.getElementById('st-leave-max-consecutive')) document.getElementById('st-leave-max-consecutive').value = lsSettings.leaveMaxConsecutive;
     if (lsSettings.departments && document.getElementById('st-departments')) document.getElementById('st-departments').value = lsSettings.departments;
 }
 
@@ -2811,7 +2867,8 @@ function saveSystemSettings() {
             departments: document.getElementById('st-departments')?.value,
             leaveSick: document.getElementById('st-leave-sick')?.value,
             leavePersonal: document.getElementById('st-leave-personal')?.value,
-            leaveVacation: document.getElementById('st-leave-vacation')?.value
+            leaveVacation: document.getElementById('st-leave-vacation')?.value,
+            leaveMaxConsecutive: document.getElementById('st-leave-max-consecutive')?.value
         };
 
         const logoPreview = document.getElementById('st-logo-preview');

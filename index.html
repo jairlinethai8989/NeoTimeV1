@@ -901,7 +901,13 @@
                 <input type="number" class="form-control" id="st-leave-vacation" value="6" min="0">
               </div>
             </div>
-          </div>
+            <div style="display: flex; gap: 12px; margin-bottom: 8px;">
+              <div class="form-group" style="flex:1;">
+                <label>ห้ามลาต่อเนื่องเกิน (วัน)</label>
+                <input type="number" class="form-control" id="st-leave-max-consecutive" value="3" min="1" placeholder="เช่น 3 หมายถึงห้ามลาเกิน 3 วันติดต่อกัน">
+                <small class="text-muted">กำหนดจำนวนวันสูงสุดที่พนักงานสามารถลาติดต่อกันได้</small>
+              </div>
+            </div>
           
           <div class="card p-24">
             <h3 class="card-title"><i class="fa-solid fa-building-user"></i> ตั้งค่าองค์กร</h3>
@@ -942,7 +948,7 @@
 
       <!-- Page: Worklog -->
       <div class="page-content" id="page-worklog">
-        <div class="management-header" style="margin-bottom: 24px;">
+        <div class="management-header" style="margin-bottom: 16px;">
           <h2 class="page-title"><i class="fa-solid fa-file-pen"></i> บันทึกการทำงานประจำวัน (Timesheet)</h2>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">
             <button class="btn btn-outline" onclick="exportWorklog()"><i class="fa-solid fa-file-export"></i> Export CSV</button>
@@ -951,7 +957,7 @@
           </div>
         </div>
 
-        <div class="card p-24">
+        <div class="card" style="padding: 20px;">
             <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 16px;">
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <h3 class="card-title" style="margin: 0;"><i class="fa-solid fa-clipboard-list"></i> ข้อมูลบันทึกการทำงาน</h3>
@@ -1484,6 +1490,28 @@
             <button class="btn btn-outline" onclick="closeModal('signature-modal')">ยกเลิก</button>
             <button class="btn btn-primary" onclick="confirmSignatureModal()"><i class="fa-solid fa-save"></i> นำไปใช้</button>
            </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Employee Picker for Shift Scheduling -->
+    <div class="modal-overlay" id="shift-emp-picker-modal">
+      <div class="modal" style="max-width: 500px;">
+        <div class="modal-header">
+          <h3><i class="fa-solid fa-user-check"></i> เลือกพนักงานลงตารางกะ</h3>
+          <button class="btn-icon" onclick="closeModal('shift-emp-picker-modal')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+          <div style="margin-bottom: 12px;">
+            <input type="text" class="form-control" id="shift-emp-search" placeholder="ค้นหาชื่อพนักงาน..." oninput="filterShiftEmpPicker()">
+          </div>
+          <div id="shift-emp-checkbox-list" style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Checkboxes rendered by JS -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('shift-emp-picker-modal')">ยกเลิก</button>
+          <button class="btn btn-primary" onclick="confirmShiftEmpPicker()"><i class="fa-solid fa-check"></i> เพิ่มพนักงานที่เลือก</button>
         </div>
       </div>
     </div>
