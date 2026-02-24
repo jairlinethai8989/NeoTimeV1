@@ -61,6 +61,10 @@
         <div class="nav-item-content"><i class="fa-solid fa-map"></i> <span>แผนที่</span></div>
       </a>
 
+      <a class="nav-item" data-page="worklog" onclick="navigateTo('worklog', this)">
+        <div class="nav-item-content"><i class="fa-solid fa-file-pen"></i> <span>บันทึกการทำงาน</span></div>
+      </a>
+
       <div class="nav-group">
         <a class="nav-item nav-has-child" onclick="toggleNavGroup(this)">
           <div class="nav-item-content"><i class="fa-solid fa-calendar-days"></i> <span>ตารางกะงาน</span></div>
@@ -884,6 +888,41 @@
         </div>
       </div>
 
+      <!-- Page: Worklog -->
+      <div class="page-content" id="page-worklog">
+        <div class="management-header" style="margin-bottom: 24px;">
+          <h2 class="page-title"><i class="fa-solid fa-file-pen"></i> บันทึกการทำงานประจำวัน (Timesheet)</h2>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn btn-outline" onclick="exportWorklog()"><i class="fa-solid fa-file-export"></i> Export CSV</button>
+            <button class="btn btn-outline" onclick="sendWorklogMonthly()"><i class="fa-solid fa-paper-plane"></i> ส่งรายงานประจำเดือน</button>
+            <button class="btn btn-primary" onclick="saveWorklogDraft()"><i class="fa-solid fa-save"></i> Save Draft & Submit</button>
+          </div>
+        </div>
+
+        <div class="card p-24">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 class="card-title" style="margin: 0;"><i class="fa-solid fa-clipboard-list"></i> รายการบันทึกการทำงานของวันที่ <span id="wl-current-date">...</span></h3>
+                <button class="btn btn-outline" onclick="addWorklogEntry()"><i class="fa-solid fa-plus"></i> เพิ่มรายการงาน</button>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 140px;">เวลาเริ่ม - สิ้นสุด</th>
+                            <th>รายละเอียดการทำงาน / โปรเจกต์ <span class="text-danger">*</span></th>
+                            <th style="width: 150px;">ความคืบหน้า (%)</th>
+                            <th style="width: 80px;">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="worklog-tbody">
+                        <!-- Entries added dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      </div>
+
       <!-- Page: Profile -->
       <div class="page-content" id="page-profile">
         <div class="management-header" style="margin-bottom: 24px;">
@@ -895,8 +934,9 @@
           <!-- Profile Header Card -->
           <div class="card p-24" style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
             <div class="profile-avatar" style="position: relative;">
+              <input type="file" id="profile-upload" hidden accept="image/*" onchange="previewProfileImage(this)">
               <img src="https://ui-avatars.com/api/?name=User&background=2563eb&color=fff" id="profile-img-preview" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 4px solid var(--surface); box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-              <button class="btn-icon" style="position: absolute; bottom: 0; right: 0; background: var(--primary); color: white; width: 32px; height: 32px;" title="เปลี่ยนรูปโปรไฟล์"><i class="fa-solid fa-camera"></i></button>
+              <button type="button" class="btn-icon" style="position: absolute; bottom: 0; right: 0; background: var(--primary); color: white; width: 32px; height: 32px;" title="เปลี่ยนรูปโปรไฟล์" onclick="document.getElementById('profile-upload').click()"><i class="fa-solid fa-camera"></i></button>
             </div>
             <div class="profile-title-info" style="flex: 1;">
               <h3 id="profile-display-name" style="font-size: 24px; margin-bottom: 4px;">กำลังโหลด...</h3>
@@ -943,20 +983,16 @@
                 </div>
                 
                 <div class="form-group" style="grid-column: 1 / -1; margin-top: 12px;">
-                  <label>ลายเซ็นอิเล็กทรอนิกส์ (อัปโหลด หรือ เซ็นด้วยเมาส์/นิ้ว)</label>
-                  <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: start; background: var(--bg-main); padding: 12px; border-radius: 8px;">
-                    <div style="flex: 1; min-width: 300px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-                      <canvas id="signature-canvas" width="400" height="150" style="width: 100%; touch-action: none; cursor: crosshair;"></canvas>
-                      <div style="background: #f8fafc; padding: 8px; border-top: 1px solid var(--border); display: flex; justify-content: space-between;">
-                        <button type="button" class="btn-icon" style="padding: 4px 8px; font-size: 11px; background: white; border: 1px solid #ddd; border-radius: 4px;" onclick="clearSignature()"><i class="fa-solid fa-eraser"></i> ล้างลายเซ็นที่วาด</button>
-                        <small class="text-muted" style="line-height: 24px; font-size: 11px;">*เซ็นในกรอบด้านบน (ใช้ยืนยันเอกสาร)</small>
-                      </div>
-                    </div>
-                    <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; background: white; border: 1px dashed var(--border); border-radius: 8px;">
+                  <label>ลายเซ็นอิเล็กทรอนิกส์</label>
+                  <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: start; background: var(--bg-main); padding: 16px; border-radius: 8px;">
+                     <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; background: white; border: 1px dashed var(--border); border-radius: 8px;">
                       <img id="saved-signature-preview" src="" style="max-width: 100%; max-height: 80px; display: none;" alt="Saved Signature">
-                      <p id="no-signature-text" class="text-muted" style="font-size: 12px; margin: 0;">ยังไม่มีลายเซ็นในระบบ</p>
+                      <p id="no-signature-text" class="text-muted" style="font-size: 13px; margin: 0 0 12px 0;">ยังไม่มีลายเซ็นในระบบ</p>
+                      <button type="button" class="btn btn-outline" onclick="openSignatureModal()"><i class="fa-solid fa-pen-nib"></i> จัดการลายเซ็นของฉัน</button>
                     </div>
                   </div>
+                  <input type="hidden" id="prof-signature_base64">
+                </div>
                   <input type="hidden" id="prof-signature_base64">
                 </div>
 
@@ -1328,6 +1364,40 @@
             </div>
 
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signature Modal -->
+    <div id="signature-modal" class="modal-overlay">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3 id="signature-modal-title"><i class="fa-solid fa-pen-nib"></i> จัดการลายเซ็นอิเล็กทรอนิกส์</h3>
+          <button class="btn-icon" onclick="closeModal('signature-modal')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <p class="text-muted" style="font-size: 13px; margin-bottom: 12px;">วาดลายเซ็นของคุณลงในกรอบด้านล่าง หรืออัปโหลดภาพลายเซ็น (พื้นหลังโปร่งใสแนะนำ)</p>
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center;">
+                <strong>วาดลายเซ็น</strong>
+                <button type="button" class="btn-icon" style="padding: 4px 8px; font-size: 11px; background: white; border: 1px solid #ddd; border-radius: 4px;" onclick="clearSignature()"><i class="fa-solid fa-eraser"></i> ล้างลายเซ็น</button>
+            </div>
+            
+            <div style="border: 2px dashed var(--border); border-radius: var(--radius-sm); background: #f8fafc; overflow: hidden; height: 250px; position: relative; margin-bottom: 16px;">
+              <canvas id="signature-canvas" width="600" height="250" style="width: 100%; height: 100%; touch-action: none; cursor: crosshair;"></canvas>
+            </div>
+            
+            <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 16px;">
+               <label>หรือแนบไฟล์รูปภาพลายเซ็น</label>
+               <input type="file" id="signature-file-upload" class="form-control" accept="image/*" onchange="importSignatureFile(this)">
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: space-between;">
+           <span class="text-muted" style="font-size: 11px; align-self: center;">*ลายเซ็นนี้จะอัปเดตลงในโปรไฟล์ของคุณ</span>
+           <div>
+            <button class="btn btn-outline" onclick="closeModal('signature-modal')">ยกเลิก</button>
+            <button class="btn btn-primary" onclick="confirmSignatureModal()"><i class="fa-solid fa-save"></i> นำไปใช้</button>
+           </div>
         </div>
       </div>
     </div>

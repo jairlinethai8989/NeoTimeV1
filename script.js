@@ -132,7 +132,7 @@ function applyUserPermissions() {
 
     // Check if the current initialized page is allowed
     const startPage = document.querySelector('.nav-item.active[data-page]')?.getAttribute('data-page') || 'dashboard';
-    if (!perms.includes(startPage) && startPage !== 'profile') {
+    if (!perms.includes(startPage) && startPage !== 'profile' && startPage !== 'worklog') {
         const fallbackPage = perms[0] || 'profile';
         const targetEl = document.querySelector(`[data-page="${fallbackPage}"]`);
         if (targetEl) {
@@ -195,6 +195,7 @@ window.navigateTo = function (pageId, element, isChild = false) {
         'auto-escalation': 'Auto-Escalation',
         'settings': 'ตั้งค่าระบบ',
         'profile': 'โปรไฟล์',
+        'worklog': 'บันทึกการทำงาน',
         'manage-shifts': 'จัดตารางกะงาน'
     };
     document.getElementById('page-title').textContent = titleMap[pageId] || pageId;
@@ -224,6 +225,9 @@ window.navigateTo = function (pageId, element, isChild = false) {
         if (clockIntervalId) clearInterval(clockIntervalId);
     } else if (pageId === 'profile') {
         loadProfileData();
+        if (clockIntervalId) clearInterval(clockIntervalId);
+    } else if (pageId === 'worklog') {
+        loadWorklogPage();
         if (clockIntervalId) clearInterval(clockIntervalId);
     } else if (pageId === 'shifts') {
         loadShifts();
@@ -2186,9 +2190,14 @@ async function saveProfileData() {
         const nameEl = document.getElementById('user-display-name');
         if (nameEl) nameEl.textContent = payload.full_name;
         
-        // Generate new avatar
-        const encodedName = encodeURIComponent(payload.full_name || 'User');
-        document.getElementById('profile-img-preview').src = `https://ui-avatars.com/api/?name=${encodedName}&background=2563eb&color=fff`;
+        // Generate new avatar or keep custom
+        const localAvatar = localStorage.getItem('userAvatar_' + MOCK_USER.uuid);
+        if(localAvatar) {
+            document.getElementById('profile-img-preview').src = localAvatar;
+        } else {
+            const encodedName = encodeURIComponent(payload.full_name || 'User');
+            document.getElementById('profile-img-preview').src = `https://ui-avatars.com/api/?name=${encodedName}&background=2563eb&color=fff`;
+        }
         
         alert("อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว");
         
@@ -2227,10 +2236,55 @@ async function requestPasswordReset() {
     }
 }
 
+// ─── PROFILE PICTURE UPLOAD ──────────────────
+function previewProfileImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let size = 200; // Profile pic size limit
+                canvas.width = size;
+                canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                
+                // Keep aspect ratio crop to center
+                let scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+                let x = (canvas.width / scale - img.width) / 2;
+                let y = (canvas.height / scale - img.height) / 2;
+                ctx.drawImage(img, x, y, img.width, img.height, 0, 0, img.width * scale, img.height * scale);
+
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                
+                const preview = document.getElementById('profile-img-preview');
+                const headerAvatar = document.getElementById('user-avatar-img');
+                if(preview) preview.src = dataUrl;
+                if(headerAvatar) headerAvatar.src = dataUrl;
+                
+                // Save to local storage for persistence across reloads (mock)
+                if(MOCK_USER && MOCK_USER.uuid) {
+                    localStorage.setItem('userAvatar_' + MOCK_USER.uuid, dataUrl);
+                }
+            };
+            img.src = e.target.result;
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
 // ─── SIGNATURE PAD & DOCUMENT VIEWER ─────────────────
 let sigCanvas, sigCtx;
 let isDrawing = false;
 let isCanvasInitialized = false;
+
+function openSignatureModal() {
+    isCanvasInitialized = false;
+    document.getElementById('signature-modal').style.display = 'flex';
+    setTimeout(() => {
+        initSignatureCanvas();
+    }, 100);
+}
 
 function initSignatureCanvas() {
     sigCanvas = document.getElementById('signature-canvas');
@@ -2238,13 +2292,7 @@ function initSignatureCanvas() {
     
     if (!isCanvasInitialized) {
         sigCtx = sigCanvas.getContext('2d');
-        sigCtx.lineWidth = 2;
-        sigCtx.lineCap = 'round';
-        sigCtx.strokeStyle = '#2563eb'; // Blue pen ink style
-        
-        // Ensure perfect size resolution
-        sigCanvas.width = sigCanvas.offsetWidth;
-        sigCanvas.height = sigCanvas.offsetHeight;
+        sigBaseSetup();
 
         sigCanvas.addEventListener('mousedown', startDrawing);
         sigCanvas.addEventListener('mousemove', draw);
@@ -2255,7 +2303,20 @@ function initSignatureCanvas() {
         sigCanvas.addEventListener('touchmove', handleTouchMove, {passive: false});
         sigCanvas.addEventListener('touchend', stopDrawing);
         isCanvasInitialized = true;
+    } else {
+        sigBaseSetup();
     }
+}
+
+function sigBaseSetup() {
+    const rect = sigCanvas.parentElement.getBoundingClientRect();
+    sigCanvas.width = rect.width;
+    sigCanvas.height = Math.max(rect.height, 200);
+    sigCtx.lineWidth = 3;
+    sigCtx.lineCap = 'round';
+    sigCtx.strokeStyle = '#2563eb';
+    // Clear initial state
+    sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
 }
 
 function startDrawing(e) {
@@ -2272,8 +2333,6 @@ function draw(e) {
     sigCtx.stroke();
     sigCtx.beginPath();
     sigCtx.moveTo(x, y);
-    
-    document.getElementById('prof-signature_base64').value = sigCanvas.toDataURL('image/png');
 }
 function stopDrawing() {
     isDrawing = false;
@@ -2295,16 +2354,44 @@ function handleTouchMove(e) {
 function clearSignature() {
     if(!sigCtx) return;
     sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
-    document.getElementById('prof-signature_base64').value = '';
+    document.getElementById('signature-file-upload').value = '';
+}
+
+function importSignatureFile(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+                // Center the image
+                const scale = Math.min(sigCanvas.width / img.width, sigCanvas.height / img.height);
+                const w = img.width * scale * 0.8;
+                const h = img.height * scale * 0.8;
+                const x = (sigCanvas.width - w) / 2;
+                const y = (sigCanvas.height - h) / 2;
+                sigCtx.drawImage(img, x, y, w, h);
+            };
+            img.src = e.target.result;
+        }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function confirmSignatureModal() {
+    const dataUrl = sigCanvas.toDataURL('image/png');
+    document.getElementById('prof-signature_base64').value = dataUrl;
     
-    // Also clear existing saved signature when resetting
+    // Check if canvas is actually empty (naive pixel check could be done, but we assume user drew something)
     const preImg = document.getElementById('saved-signature-preview');
     const noSigTxt = document.getElementById('no-signature-text');
     if(preImg) {
-        preImg.style.display = 'none';
-        preImg.src = '';
+        preImg.src = dataUrl;
+        preImg.style.display = 'block';
     }
-    if(noSigTxt) noSigTxt.style.display = 'block';
+    if(noSigTxt) noSigTxt.style.display = 'none';
+    
+    closeModal('signature-modal');
 }
 
 function openDocModal(reqId, context) {
@@ -2631,4 +2718,140 @@ function clearSettingsImage(type) {
             }
         }
     }
+}
+
+// ─── WORKLOG / TIMESHEET ─────────────────────────────────
+let worklogEntries = [];
+let wlCounter = 0;
+
+function loadWorklogPage() {
+    const dOpts = { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Bangkok' };
+    document.getElementById('wl-current-date').textContent = new Date().toLocaleDateString('th-TH', dOpts);
+    
+    // Load existing drafts from local storage (mock API call)
+    try {
+        const drafts = JSON.parse(localStorage.getItem('myWorklog_' + (MOCK_USER?.uuid || '')));
+        if(drafts && drafts.date === new Date().toISOString().split('T')[0]) {
+            worklogEntries = drafts.entries || [];
+            wlCounter = drafts.entries.length;
+        } else {
+            // New day, clear current lists
+            worklogEntries = [];
+            wlCounter = 0;
+            // Pre-fill one row based on check-in time
+            addWorklogEntry();
+        }
+    } catch(e) {
+        worklogEntries = [];
+        wlCounter = 0;
+        addWorklogEntry();
+    }
+    
+    renderWorklog();
+}
+
+function addWorklogEntry() {
+    wlCounter++;
+    worklogEntries.push({
+        id: 'wl_' + wlCounter,
+        timeRange: '09:00 - 18:00',
+        detail: '',
+        progress: '100'
+    });
+    renderWorklog();
+}
+
+function removeWorklogEntry(id) {
+    worklogEntries = worklogEntries.filter(e => e.id !== id);
+    renderWorklog();
+}
+
+function updateWorklogData(id, field, value) {
+    const entry = worklogEntries.find(e => e.id === id);
+    if(entry) {
+        entry[field] = value;
+    }
+}
+
+// Global exposure for innerHTML handlers
+window.updateWorklogData = updateWorklogData;
+
+function renderWorklog() {
+    const tbody = document.getElementById('worklog-tbody');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    
+    if(worklogEntries.length === 0) {
+       tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;" class="text-muted">ไม่พบรายการบันทึกการทำงาน กรุณาเพิ่มรายการ</td></tr>';
+       return;
+    }
+    
+    worklogEntries.forEach(entry => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="text" class="form-control" placeholder="09:00 - 18:00" value="${entry.timeRange}" onchange="window.updateWorklogData('${entry.id}', 'timeRange', this.value)"></td>
+            <td><input type="text" class="form-control" placeholder="รายละเอียดงาน / กิจกรรม" value="${entry.detail}" onchange="window.updateWorklogData('${entry.id}', 'detail', this.value)"></td>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <input type="number" class="form-control" placeholder="100" min="0" max="100" value="${entry.progress}" onchange="window.updateWorklogData('${entry.id}', 'progress', this.value)">
+                <span>%</span>
+              </div>
+            </td>
+            <td><button class="btn-icon text-danger" onclick="removeWorklogEntry('${entry.id}')"><i class="fa-solid fa-trash"></i></button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function saveWorklogDraft() {
+    confirmAction('ยืนยันการบันทึกรายการทำงานทั้งหมด?', '', () => {
+        const todayDate = new Date().toISOString().split('T')[0];
+        try {
+            if(MOCK_USER && MOCK_USER.uuid) {
+               localStorage.setItem('myWorklog_' + MOCK_USER.uuid, JSON.stringify({
+                   date: todayDate,
+                   entries: worklogEntries
+               }));
+            }
+            alert('บันทึกข้อมูลการทำงาน (Draft / Submit) เรียบร้อยแล้ว');
+        } catch(e) {
+            alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+        }
+    });
+}
+
+function exportWorklog() {
+    if(worklogEntries.length === 0) {
+        alert('ยังไม่มีข้อมูลการทำงานสำหรับ Export');
+        return;
+    }
+    
+    let csv = '\\uFEFF'; 
+    csv += 'เวลาเริ่ม-สิ้นสุด,รายละเอียดการทำงาน,ความคืบหน้า(%)\\n';
+    
+    worklogEntries.forEach(e => {
+        const time = `"${e.timeRange.replace(/"/g, '""')}"`;
+        const detail = `"${e.detail.replace(/"/g, '""')}"`;
+        const prog = `"${e.progress}"`;
+        csv += `${time},${detail},${prog}\\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Worklog_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function sendWorklogMonthly() {
+    if(worklogEntries.length === 0) {
+        alert('ไม่มีข้อมูลการทำงานสำหรับส่งรายงาน');
+        return;
+    }
+    confirmAction('ส่งสรุปรายงานการทำงานทั้งหมดให้ผู้บริหาร?', '', () => {
+        alert('ส่งรายงานประจำเดือนให้ผู้บริหารทางอีเมลเรียบร้อยแล้ว (Mock System)');
+    });
 }
