@@ -245,25 +245,26 @@
 
         <!-- Dashboard Charts and Activity -->
         <div class="dashboard-content">
-          <div class="dashboard-card" style="flex:1;">
-            <div class="card-header">
-              <h3 class="card-title"><i class="fa-solid fa-chart-pie"></i> ภาพรวมการเข้างานวันนี้</h3>
-            </div>
-            <div class="card-body" style="display:flex; flex-direction:column; align-items:center;">
-              <div class="donut-chart-container">
-                <!-- CSS Donut Graph -->
-                <div class="donut-chart">
-                  <div class="donut-inner">
-                    <span>79%</span>
-                    <small>มาทำงาน</small>
-                  </div>
-                </div>
+          <div class="dashboard-card" style="flex:2;">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <h3 class="card-title"><i class="fa-solid fa-calendar-check"></i> ปฏิทินการลาประจำเดือน</h3>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <button class="btn-icon" onclick="changeDashLeaveMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+                <span id="dash-leave-month-label" style="font-weight:600; font-size:14px;">-</span>
+                <button class="btn-icon" onclick="changeDashLeaveMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
               </div>
-              <div class="donut-legend">
-                <div class="legend-item"><span class="dot success"></span> ตรงเวลา (83)</div>
-                <div class="legend-item"><span class="dot warning"></span> สาย (12)</div>
-                <div class="legend-item"><span class="dot danger"></span> ขาด (13)</div>
-                <div class="legend-item"><span class="dot info"></span> ลา (12)</div>
+            </div>
+            <div class="card-body" style="padding: 12px;">
+              <div style="display:grid; grid-template-columns: repeat(7, 1fr); text-align:center; font-size: 11px; font-weight: bold; color: var(--text-muted); margin-bottom: 4px;">
+                <div>อา</div><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div>ส</div>
+              </div>
+              <div id="dash-leave-calendar" style="display:grid; grid-template-columns: repeat(7, 1fr); gap: 2px;">
+                <!-- Rendered by JS -->
+              </div>
+              <div style="display:flex; gap:16px; margin-top:12px; font-size:12px; color:var(--text-muted); flex-wrap:wrap;">
+                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#ef4444;vertical-align:middle;margin-right:4px;"></span>ลาป่วย</div>
+                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#f59e0b;vertical-align:middle;margin-right:4px;"></span>ลากิจ</div>
+                <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#3b82f6;vertical-align:middle;margin-right:4px;"></span>ลาพักร้อน</div>
               </div>
             </div>
           </div>
@@ -275,7 +276,7 @@
             <div class="card-body" style="padding:0; position: relative; overflow: hidden; border-bottom-left-radius: var(--radius-lg); border-bottom-right-radius: var(--radius-lg);">
                <div id="dash-mini-map" style="width: 100%; height: 260px; z-index: 1;"></div>
                <div style="position: absolute; bottom: 12px; right: 12px; z-index: 2;">
-                  <button class="btn btn-primary" style="padding: 6px 12px; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="navigateTo('map', document.querySelector('[data-page=map]'))"><i class="fa-solid fa-maximize"></i> ขยายแผนที่หลัก</button>
+                 <button class="btn btn-primary" style="padding: 6px 12px; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);" onclick="navigateTo('map', document.querySelector('[data-page=map]'))"><i class="fa-solid fa-maximize"></i> ขยายแผนที่หลัก</button>
                </div>
             </div>
           </div>
@@ -912,8 +913,15 @@
           <div class="card p-24">
             <h3 class="card-title"><i class="fa-solid fa-building-user"></i> ตั้งค่าองค์กร</h3>
             <div class="form-group mb-16">
-              <label>แผนก / ฝ่าย (คั่นด้วยลูกน้ำ ",")</label>
-              <textarea id="st-departments" class="form-control" rows="2" placeholder="ไอที, บัญชี, ฝ่ายขาย, ฝ่ายบุคคล"></textarea>
+              <label>แผนก / ฝ่าย</label>
+              <div id="dept-tags-container" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; min-height:36px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: white;">
+                <!-- Department tags rendered by JS -->
+              </div>
+              <div style="display:flex; gap:8px;">
+                <input type="text" id="dept-new-input" class="form-control" placeholder="พิมพ์ชื่อแผนกใหม่..." style="flex:1;">
+                <button class="btn btn-primary" type="button" onclick="addDepartmentTag()" style="padding: 8px 16px;"><i class="fa-solid fa-plus"></i> เพิ่มแผนก</button>
+              </div>
+              <input type="hidden" id="st-departments">
             </div>
           </div>
           
@@ -1163,6 +1171,24 @@
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="workplaces"> จัดการหน้างาน</label>
                 <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="settings"> ตั้งค่าระบบ</label>
               </div>
+            </div>
+            <div class="form-group mb-16">
+              <label><i class="fa-solid fa-calendar-check"></i> สิทธิ์การลา (เฉพาะพนักงานคนนี้)</label>
+              <div style="display:flex; gap:12px; flex-wrap:wrap; border: 1px solid var(--border); padding: 10px; border-radius: 6px; background: white;">
+                <div class="form-group" style="flex:1; min-width:100px;">
+                  <label style="font-size:11px;">ลาป่วย (วัน)</label>
+                  <input type="number" class="form-control" id="u-leave-sick" value="" min="0" placeholder="ตามค่าเริ่มต้น">
+                </div>
+                <div class="form-group" style="flex:1; min-width:100px;">
+                  <label style="font-size:11px;">ลากิจ (วัน)</label>
+                  <input type="number" class="form-control" id="u-leave-personal" value="" min="0" placeholder="ตามค่าเริ่มต้น">
+                </div>
+                <div class="form-group" style="flex:1; min-width:100px;">
+                  <label style="font-size:11px;">ลาพักร้อน (วัน)</label>
+                  <input type="number" class="form-control" id="u-leave-vacation" value="" min="0" placeholder="ตามค่าเริ่มต้น">
+                </div>
+              </div>
+              <small class="text-muted">หากเว้นว่าง จะใช้ค่าเริ่มต้นจากตั้งค่าระบบแทน</small>
             </div>
           </form>
         </div>

@@ -484,6 +484,7 @@ function loadDashboard() {
     fetchDashboardStats();
     initDashMiniMap();
     updateApprovalBadges();
+    loadDashLeaveCalendar();
 }
 
 let miniDashMap = null;
@@ -512,6 +513,103 @@ function initDashMiniMap() {
     setTimeout(() => {
         miniDashMap.invalidateSize();
     }, 400);
+}
+
+// ─── DASHBOARD LEAVE CALENDAR ─────────────────────────
+let dashLeaveMonth = new Date();
+
+function loadDashLeaveCalendar() {
+    const year = dashLeaveMonth.getFullYear();
+    const month = dashLeaveMonth.getMonth();
+    const monthNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    
+    const label = document.getElementById('dash-leave-month-label');
+    if(label) label.textContent = `${monthNames[month]} ${year}`;
+    
+    const calEl = document.getElementById('dash-leave-calendar');
+    if(!calEl) return;
+    
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    
+    let html = '';
+    // Blank cells for offset
+    for(let i=0; i<firstDay; i++) {
+        html += '<div style="padding:6px; text-align:center;"></div>';
+    }
+    
+    for(let d=1; d<=daysInMonth; d++) {
+        const isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        
+        // Check if any leave requests match this date
+        let dotHtml = '';
+        const leaveForDay = myRequestsData.filter(r => 
+            r.type === 'leave' && r.status === 'approved' && r.startDate <= dateStr && (r.endDate || r.startDate) >= dateStr
+        );
+        if(leaveForDay.length > 0) {
+            const lt = leaveForDay[0].leaveType || '';
+            let dotColor = '#f59e0b';
+            if(lt.includes('ป่วย')) dotColor = '#ef4444';
+            else if(lt.includes('พักร้อน')) dotColor = '#3b82f6';
+            dotHtml = `<div style="width:6px;height:6px;border-radius:50%;background:${dotColor};margin:2px auto 0;"></div>`;
+        }
+        
+        html += `<div style="padding:6px; text-align:center; font-size:13px; border-radius:6px; cursor:default; ${isToday ? 'background:var(--primary); color:white; font-weight:bold;' : ''}">
+            ${d}${dotHtml}
+        </div>`;
+    }
+    calEl.innerHTML = html;
+}
+
+function changeDashLeaveMonth(dir) {
+    dashLeaveMonth.setMonth(dashLeaveMonth.getMonth() + dir);
+    loadDashLeaveCalendar();
+}
+
+// ─── DEPARTMENT TAG MANAGEMENT ─────────────────────────
+let departmentTags = [];
+
+function renderDepartmentTags() {
+    const container = document.getElementById('dept-tags-container');
+    if(!container) return;
+    
+    if(departmentTags.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-muted); font-size:13px;">ยังไม่มีแผนก กรุณากด + เพิ่มแผนก</span>';
+    } else {
+        container.innerHTML = departmentTags.map((tag, idx) => `
+            <span style="display:inline-flex; align-items:center; gap:6px; background: #eef2ff; color: #4f46e5; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 500;">
+                ${tag}
+                <button type="button" onclick="removeDepartmentTag(${idx})" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:14px; padding:0; line-height:1;">&times;</button>
+            </span>
+        `).join('');
+    }
+    // Update hidden input
+    const hiddenInput = document.getElementById('st-departments');
+    if(hiddenInput) hiddenInput.value = departmentTags.join(',');
+}
+
+function addDepartmentTag() {
+    const input = document.getElementById('dept-new-input');
+    const name = (input.value || '').trim();
+    if(!name) return alert('กรุณาพิมพ์ชื่อแผนก');
+    if(departmentTags.includes(name)) return alert('แผนกนี้มีอยู่แล้ว');
+    departmentTags.push(name);
+    input.value = '';
+    renderDepartmentTags();
+}
+
+function removeDepartmentTag(idx) {
+    departmentTags.splice(idx, 1);
+    renderDepartmentTags();
+}
+
+function loadDepartmentTagsFromSettings() {
+    const lsSettings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+    const deptStr = lsSettings.departments || '';
+    departmentTags = deptStr.split(',').map(d => d.trim()).filter(d => d);
+    renderDepartmentTags();
 }
 
 function updateApprovalBadges() {
@@ -2845,6 +2943,9 @@ function loadSystemSettings() {
     if (lsSettings.leaveVacation !== undefined && document.getElementById('st-leave-vacation')) document.getElementById('st-leave-vacation').value = lsSettings.leaveVacation;
     if (lsSettings.leaveMaxConsecutive !== undefined && document.getElementById('st-leave-max-consecutive')) document.getElementById('st-leave-max-consecutive').value = lsSettings.leaveMaxConsecutive;
     if (lsSettings.departments && document.getElementById('st-departments')) document.getElementById('st-departments').value = lsSettings.departments;
+    
+    // Load department tags UI
+    loadDepartmentTagsFromSettings();
 }
 
 function saveSystemSettings() {
