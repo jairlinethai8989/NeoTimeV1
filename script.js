@@ -515,9 +515,9 @@ function initDashMiniMap() {
 }
 
 function updateApprovalBadges() {
-    // Mock counts based on sample data size
-    const otCount = 2; // For mock purpose
-    const leaveCount = 3; 
+    // Fetch real counts from DB in the future. Currently zeroed for production readiness.
+    const otCount = 0; 
+    const leaveCount = 0; 
     const total = otCount + leaveCount;
     
     const badgeTotal = document.getElementById('nav-badge-approve-total');
@@ -1405,11 +1405,8 @@ function loadTargetUserShifts() {
         return;
     }
 
-    // Mock load shifts of the target user
-    const mockShifts = [
-        { date: '2026-02-15', label: '14:00 - 23:00' },
-        { date: '2026-02-18', label: '08:00 - 17:00' }
-    ];
+    // Real app should load shifts from DB
+    const mockShifts = [];
 
     seltarget.innerHTML = '<option value="">-- เลือกกะที่ต้องการสลับ --</option>' +
         mockShifts.map(s => `<option value="${s.date}">${s.date} (กะ ${s.label})</option>`).join('');
@@ -1430,11 +1427,9 @@ function submitSwapRequest() {
 }
 
 function loadSwapRequests() {
-    // Mock DB: someone requested to swap with YOU
+    // Fetch real data from DB
     if (swapRequestsList.length === 0) {
-        swapRequestsList = [
-            { id: 'SWQ01', fromUser: 'สุดา รักดี (EMP002)', fromDate: '2026-02-23 (14:00 - 23:00)', toDate: '2026-02-22 (08:00 - 17:00)', reason: 'ติดธุระด่วน', status: 'pending' }
-        ];
+        // Ready for real data
     }
 
     const pending = swapRequestsList.filter(r => r.status === 'pending');
@@ -1524,13 +1519,9 @@ function loadMyRequests(filter) {
 
     container.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</div>';
 
-    // Mock data
+    // Real app should fetch from Supabase here
     if (myRequestsData.length === 0) {
-        myRequestsData = [
-            { id: 'REQ001', type: 'leave', leaveType: 'ลาพักร้อน', startDate: '2026-03-01', endDate: '2026-03-03', reason: 'พักผ่อนประจำปี', status: 'pending', created: '2026-02-20 10:30' },
-            { id: 'REQ002', type: 'ot', otStart: '18:00', otEnd: '21:00', startDate: '2026-02-18', reason: 'เคลียร์งานโปรเจค A', status: 'approved', created: '2026-02-15 09:15' },
-            { id: 'REQ003', type: 'leave', leaveType: 'ลาป่วย', startDate: '2026-01-10', endDate: '2026-01-11', reason: 'ไข้หวัด', status: 'rejected', created: '2026-01-10 08:30' }
-        ];
+        // Ready for real data
     }
 
     setTimeout(() => {
@@ -1719,13 +1710,9 @@ function loadApproveOT() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>';
 
-    // Mock Data
+    // Fetch real data from DB
     if (approveOTData.length === 0) {
-        approveOTData = [
-            { id: 'OT001', empId: 'EMP005', empName: 'วิชัย รักดี', date: '2026-02-23', startTime: '18:00', endTime: '21:00', reason: 'เร่งปิดออเดอร์ลูกค้า', status: 'pending' },
-            { id: 'OT002', empId: 'EMP010', empName: 'มารศรี งานไว', date: '2026-02-21', startTime: '17:30', endTime: '20:30', reason: 'งานระบบเซิร์ฟเวอร์', status: 'approved' },
-            { id: 'OT003', empId: 'EMP008', empName: 'สิริกัญญา งามตา', date: '2026-02-20', startTime: '18:00', endTime: '19:00', reason: 'เคลียร์เอกสาร', status: 'rejected' }
-        ];
+        // Ready for real data
     }
 
     setTimeout(() => filterApproveOT(), 400);
@@ -1819,13 +1806,9 @@ function loadApproveLeave() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>';
 
-    // Mock Data
+    // Fetch real data from DB
     if (approveLeaveData.length === 0) {
-        approveLeaveData = [
-            { id: 'LV001', empId: 'EMP012', empName: 'อารยา ทัศนัย', type: 'ลาป่วย', startDate: '2026-02-24', endDate: '2026-02-25', reason: 'ติดเชื้อทางเดินหายใจ', docUrl: 'https://via.placeholder.com/150', status: 'pending' },
-            { id: 'LV002', empId: 'EMP005', empName: 'วิชัย รักดี', type: 'ลาพักร้อน', startDate: '2026-03-10', endDate: '2026-03-12', reason: 'ทริปครอบครัว', docUrl: '', status: 'approved' },
-            { id: 'LV003', empId: 'EMP009', empName: 'สมชาติ แซ่ลี้', type: 'ลากิจ', startDate: '2026-02-20', endDate: '2026-02-20', reason: 'ติดต่อราชการ', docUrl: '', status: 'pending' }
-        ];
+        // Ready for real data
     }
 
     setTimeout(() => filterApproveLeave(), 400);
@@ -1937,14 +1920,9 @@ function loadGeneralReport() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>';
 
-    // Mock Data
+    // Fetch real data from DB
     if (generalReportData.length === 0) {
-        generalReportData = [
-            { date: '2026-02-23', empId: 'EMP001', empName: 'สมชาย ใจดี', wp: 'สำนักงานใหญ่', timeIn: '08:45', timeOut: '17:30', status: 'ปกติ' },
-            { date: '2026-02-23', empId: 'EMP002', empName: 'สุดา รักดี', wp: 'สาขาเชียงใหม่', timeIn: '09:15', timeOut: '18:00', status: 'สาย' },
-            { date: '2026-02-22', empId: 'EMP001', empName: 'สมชาย ใจดี', wp: 'สำนักงานใหญ่', timeIn: '08:50', timeOut: '18:10', status: 'ปกติ' },
-            { date: '2026-02-22', empId: 'EMP005', empName: 'วิชัย รักดี', wp: 'สำนักงานใหญ่', timeIn: '-', timeOut: '-', status: 'ขาดงาน' }
-        ];
+        // Ready for real data
     }
 
     setTimeout(() => filterGeneralReport(), 400);
@@ -2015,13 +1993,9 @@ function loadLeaveReport() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>';
 
-    // Mock Data
+    // Fetch real data from DB
     if (leaveReportData.length === 0) {
-        leaveReportData = [
-            { id: 'LV001', empId: 'EMP012', empName: 'อารยา ทัศนัย', type: 'leave', typeLabel: 'ลางาน', detail: 'ลาป่วย (ติดเชื้อทางเดินหายใจ)', dateStr: '2026-02-24 ถึง 2026-02-25', status: 'approved' },
-            { id: 'OT002', empId: 'EMP010', empName: 'มารศรี งานไว', type: 'ot', typeLabel: 'OT', detail: 'งานระบบเซิร์ฟเวอร์', dateStr: '2026-02-21 (17:30 - 20:30)', status: 'approved' },
-            { id: 'LV003', empId: 'EMP009', empName: 'สมชาติ แซ่ลี้', type: 'leave', typeLabel: 'ลางาน', detail: 'ลากิจ (ติดต่อราชการ)', dateStr: '2026-02-20', status: 'rejected' }
-        ];
+        // Ready for real data
     }
 
     setTimeout(() => filterLeaveReport(), 400);
@@ -2079,13 +2053,9 @@ function loadAuditLog() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding: 20px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดข้อมูล...</td></tr>';
 
+    // Fetch real data from DB
     if (auditLogData.length === 0) {
-        auditLogData = [
-            { timestamp: '2026-02-22 15:30:12', user: 'admin.hr', action: 'อนุมัติการลา', detail: 'อนุมัติการลาป่วยให้ EMP012', ip: '110.164.21.XX' },
-            { timestamp: '2026-02-22 14:15:00', user: 'system', action: 'Auto-Checkout', detail: 'ระบบลงเวลาออกให้อัตโนมัติ (6 รายการ)', ip: 'localhost' },
-            { timestamp: '2026-02-22 10:05:41', user: 'admin.hr', action: 'แก้ไขสิทธิ์พนักงาน', detail: 'เปลี่ยนสถานะ EMP005 เป็นหัวหน้างาน', ip: '110.164.21.XX' },
-            { timestamp: '2026-02-22 08:30:00', user: 'somchai.j', action: 'ลงเวลาเข้างาน', detail: 'เช็คอินที่ สำนักงานใหญ่ (พิกัด: 13.75, 100.5)', ip: '223.24.11.XX' }
-        ];
+        // Ready for real data
     }
 
     setTimeout(() => {
