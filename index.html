@@ -20,6 +20,9 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <!-- HTML2PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -58,10 +61,16 @@
         <div class="nav-item-content"><i class="fa-solid fa-map"></i> <span>แผนที่</span></div>
       </a>
 
-      <a class="nav-item" data-page="shifts" onclick="navigateTo('shifts', this)">
-        <div class="nav-item-content"><i class="fa-solid fa-calendar-days"></i> <span>ตารางกะงาน</span></div>
-      </a>
-
+      <div class="nav-group">
+        <a class="nav-item nav-has-child" onclick="toggleNavGroup(this)">
+          <div class="nav-item-content"><i class="fa-solid fa-calendar-days"></i> <span>ตารางกะงาน</span></div>
+          <i class="fa-solid fa-chevron-down nav-arrow"></i>
+        </a>
+        <div class="nav-children">
+          <a class="nav-child" data-page="shifts" onclick="navigateTo('shifts', this, true)">ดูตารางกะงาน</a>
+          <a class="nav-child" data-page="manage-shifts" onclick="navigateTo('manage-shifts', this, true)">จัดตารางกะงาน</a>
+        </div>
+      </div>
       <!-- Groups / Dropdowns -->
       <div class="nav-group">
         <a class="nav-item nav-has-child" onclick="toggleNavGroup(this)">
@@ -249,16 +258,35 @@
 
           <!-- Status Card -->
           <div class="checkin-status empty">
-            <div class="status-icon"><i class="fa-solid fa-mug-hot"></i></div>
-            <h3>ยังไม่ได้ลงเวลา</h3>
-            <p>กรุณาเลือกหน้างานเพื่อเช็คอิน</p>
+            <div class="status-icon"><i class="fa-solid fa-location-dot"></i></div>
+            <h3>ระบบลงเวลาอิสระ</h3>
+            <p>คุณสามารถลงเวลาเข้า-ออกงานได้จากทุกที่</p>
+          </div>
+
+          <!-- Attendance Type -->
+          <div class="checkin-card" style="margin-bottom: 24px; padding: 16px; border: 2px solid var(--border);" id="ci-type-card">
+            <h4 style="margin-bottom: 12px; font-size: 14px; text-align: center;"><i class="fa-solid fa-clipboard-list text-primary"></i> เลือกประเภทการลงเวลา</h4>
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: bold; font-size: 15px;">
+                    <input type="radio" name="ci-type" value="เวลาปกติ" checked onchange="updateCheckinColors('normal')">
+                    <span style="color: var(--primary);">เวลาปกติ</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: bold; font-size: 15px;">
+                    <input type="radio" name="ci-type" value="OT" onchange="updateCheckinColors('ot')">
+                    <span style="color: var(--warning);">OT</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: bold; font-size: 15px;">
+                    <input type="radio" name="ci-type" value="เข้ากะ" onchange="updateCheckinColors('shift')">
+                    <span style="color: var(--info);">เข้ากะ</span>
+                </label>
+            </div>
           </div>
 
           <!-- Location Info -->
-          <div class="checkin-card">
-            <h3 class="card-title"><i class="fa-solid fa-location-crosshairs"></i> ข้อมูลพิกัด & หน้างาน</h3>
+          <div class="checkin-card" style="margin-bottom: 24px;">
+            <h3 class="card-title"><i class="fa-solid fa-location-crosshairs"></i> ข้อมูลพิกัดปัจจุบัน</h3>
 
-            <div class="gps-status-box" id="ci-gps-box">
+            <div class="gps-status-box" id="ci-gps-box" style="margin-bottom:0;">
               <div class="gps-icon"><i class="fa-solid fa-spinner fa-spin"></i></div>
               <div class="gps-info">
                 <h4>กำลังค้นหาตำแหน่ง...</h4>
@@ -267,41 +295,30 @@
               <button class="icon-btn-small" onclick="initGeo()" title="รีเฟรชตำแหน่ง"><i
                   class="fa-solid fa-arrows-rotate"></i></button>
             </div>
-
-            <div class="form-group" style="margin-top: 16px;">
-              <label>เลือกหน้างาน / สาขา</label>
-              <div class="select-wrapper">
-                <i class="fa-regular fa-building select-icon"></i>
-                <select class="form-control" id="ci-workplace">
-                  <option value="">-- รอข้อมูลหน้างาน --</option>
-                </select>
-                <button class="icon-btn-small select-action"><i class="fa-solid fa-qrcode"></i></button>
-              </div>
-            </div>
-
-            <div class="form-group" style="margin-top: 16px;">
-              <label>หมายเหตุ</label>
-              <textarea class="form-control" id="ci-note" rows="2" placeholder="ถ้ามี..."></textarea>
-            </div>
-          </div>
-
-          <!-- Identity (Removed Camera) -->
-          <div class="checkin-card">
-            <h3 class="card-title"><i class="fa-regular fa-id-badge"></i> ยืนยันตัวตน</h3>
-            <div class="info-row">
-              <div class="info-label">พนักงาน</div>
-              <div class="info-value"><strong id="ci-emp-name">กำลังโหลด...</strong> <span id="ci-emp-id"></span></div>
-            </div>
           </div>
 
           <!-- Action Buttons -->
-          <div class="checkin-actions">
-            <button class="btn btn-primary btn-checkin" id="btn-ci" onclick="submitCheckin('Check-in')">
+          <div class="checkin-actions" style="margin-bottom: 24px;">
+            <button class="btn btn-primary btn-checkin" id="btn-ci" onclick="submitCheckin('Check-in')" style="padding: 16px; font-size: 18px; border-radius: 12px; transition: all 0.3s; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);">
               <i class="fa-solid fa-right-to-bracket"></i> เช็คอิน (เข้างาน)
             </button>
-            <button class="btn btn-outline btn-checkout" id="btn-co" onclick="submitCheckin('Check-out')">
+            <button class="btn btn-outline btn-checkout" id="btn-co" onclick="submitCheckin('Check-out')" style="padding: 16px; font-size: 18px; border-radius: 12px; transition: all 0.3s;">
               <i class="fa-solid fa-right-from-bracket"></i> เช็คเอาท์ (ออกงาน)
             </button>
+          </div>
+
+          <!-- Identity & Note -->
+          <div class="checkin-card">
+            <h3 class="card-title"><i class="fa-regular fa-id-badge"></i> ข้อมูลเพิ่มเติม</h3>
+            <div class="info-row" style="margin-bottom: 16px;">
+              <div class="info-label">พนักงาน</div>
+              <div class="info-value"><strong id="ci-emp-name">กำลังโหลด...</strong> <span id="ci-emp-id"></span></div>
+            </div>
+            
+            <div class="form-group">
+              <label>หมายเหตุ (ถ้ามี)</label>
+              <textarea class="form-control" id="ci-note" rows="2" placeholder="ระบุรายละเอียดเพิ่มเติม..."></textarea>
+            </div>
           </div>
 
         </div>
@@ -353,11 +370,14 @@
         </div>
       </div>
 
-      <!-- Page: Map (wip) -->
-      <div class="page-content" id="page-map">
-        <div class="placeholder-box">
-          <h2><i class="fa-solid fa-map"></i> แผนที่</h2>
-          <p>This module will be built in the next phases.</p>
+      <!-- Page: Map -->
+      <div class="page-content" id="page-map" style="display: flex; flex-direction: column; height: calc(100vh - var(--header-h) - 48px);">
+        <div class="management-header" style="margin-bottom: 16px;">
+          <h2 class="page-title"><i class="fa-solid fa-map-location-dot"></i> แผนที่และการกระจายตัว</h2>
+          <button class="btn btn-outline" onclick="loadMap()"><i class="fa-solid fa-arrows-rotate"></i> รีเฟรชพิกัด</button>
+        </div>
+        <div class="card p-0" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; border-radius: var(--radius-lg); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+          <div id="main-leaflet-map" style="width: 100%; height: 100%; z-index: 1;"></div>
         </div>
       </div>
 
@@ -405,6 +425,60 @@
           </button>
         </div>
       </div>
+
+      <!-- Page: Manage Shifts -->
+      <div class="page-content" id="page-manage-shifts">
+        <div class="management-header">
+          <h2 class="page-title"><i class="fa-solid fa-calendar-plus"></i> จัดตารางกะงานด้วย AI</h2>
+          <button class="btn btn-primary" onclick="generateAIShifts()">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> จัดตารางด้วย AI
+          </button>
+        </div>
+        
+        <div class="card p-0" style="margin-bottom: 24px;">
+            <div style="padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
+                <h3 style="margin: 0; font-size: 16px; color: var(--text-color);"><i class="fa-solid fa-sliders"></i> เงื่อนไขในการจัดกะ</h3>
+                <button class="btn btn-outline" style="padding: 4px 12px; font-size: 13px;" onclick="addShiftCondition()">
+                    <i class="fa-solid fa-plus"></i> เพิ่มเงื่อนไข
+                </button>
+            </div>
+            <div id="shift-conditions-list" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                <!-- Condition Items -->
+                <div class="condition-item" style="display: flex; gap: 12px; align-items: center; background: white; padding: 12px; border: 1px solid var(--border); border-radius: 6px;">
+                    <label class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider round"></span>
+                    </label>
+                    <select class="form-control" style="width: auto; flex: 1;">
+                        <option value="dept">แผนก (Department)</option>
+                        <option value="emp" selected>ชื่อพนักงาน</option>
+                        <option value="shift_req">กะที่ต้องเข้า</option>
+                        <option value="max_consecutive">จำนวนกะติดต่อกันสูงสุด</option>
+                    </select>
+                    <input type="text" class="form-control" style="flex: 2;" placeholder="ระบุเงื่อนไข เช่น ต้องมีเข้ากะเช้าอย่างน้อย 1 คน">
+                    <button class="btn-icon text-danger" onclick="this.parentElement.remove()"><i class="fa-solid fa-trash"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card p-0" style="overflow: hidden;">
+          <div class="calendar-toolbar"
+            style="display:flex; justify-content:space-between; align-items:center; padding: 16px; border-bottom: 1px solid var(--border);">
+            <button class="btn-icon" onclick="changeManageMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
+            <h3 id="manage-month-year" style="margin:0; font-size:16px;">-</h3>
+            <button class="btn-icon" onclick="changeManageMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
+          </div>
+          
+          <div class="table-responsive" id="manage-shifts-table-container">
+             <!-- Scheduled shift table to be rendered by JS -->
+             <div style="text-align:center; padding: 40px; color: var(--text-muted);">
+                 <i class="fa-solid fa-calendar-days" style="font-size: 48px; margin-bottom: 16px; color: #cbd5e1;"></i>
+                 <p>กดปุ่ม "จัดตารางด้วย AI" เพื่อสร้างตารางกะงานของเดือนนี้</p>
+             </div>
+          </div>
+        </div>
+      </div>
+
 
       <!-- Page: My Requests -->
       <div class="page-content" id="page-my-requests">
@@ -742,7 +816,7 @@
       <div class="page-content" id="page-settings">
         <div class="management-header">
           <h2 class="page-title"><i class="fa-solid fa-sliders"></i> ตั้งค่าระบบ</h2>
-          <button class="btn btn-primary"><i class="fa-solid fa-save"></i> บันทึกการตั้งค่า</button>
+          <button class="btn btn-primary" onclick="saveSystemSettings()"><i class="fa-solid fa-save"></i> บันทึกการตั้งค่า</button>
         </div>
         <div class="settings-grid">
           <div class="card p-24">
@@ -750,14 +824,14 @@
             <div class="form-group mb-16">
               <label>เวลาทำงานปกติ (เข้า - ออก)</label>
               <div style="display:flex; gap:12px;">
-                <input type="time" class="form-control" value="09:00" />
+                <input type="time" class="form-control" id="st-time-in" value="09:00" />
                 <span style="display:flex; align-items:center;">-</span>
-                <input type="time" class="form-control" value="18:00" />
+                <input type="time" class="form-control" id="st-time-out" value="18:00" />
               </div>
             </div>
             <div class="form-group">
               <label>อนุโลมสายไม่เกิน (นาที)</label>
-              <input type="number" class="form-control" value="15" />
+              <input type="number" class="form-control" id="st-late-grace" value="15" />
             </div>
           </div>
 
@@ -765,27 +839,142 @@
             <h3 class="card-title"><i class="fa-solid fa-shield-halved"></i> ความปลอดภัย</h3>
             <div class="form-group mb-16">
               <label>บังคับเชื่อมต่อ Wi-Fi ออฟฟิศ</label>
-              <select class="form-control">
-                <option>ปิด</option>
-                <option>เปิด (เฉพาะจุดที่มีความเสี่ยงสูง)</option>
+              <select class="form-control" id="st-wifi">
+                <option value="off">ปิด</option>
+                <option value="on">เปิด (เฉพาะจุดที่มีความเสี่ยงสูง)</option>
               </select>
             </div>
             <div class="form-group mb-16">
               <label>บังคับถ่ายรูปทุกครั้งที่ลงเวลา</label>
-              <select class="form-control">
-                <option selected>ไม่บังคับ (เลือกใช้งานสำหรับบางไซต์)</option>
-                <option>บังคับทุกไซต์งาน</option>
+              <select class="form-control" id="st-photo">
+                <option value="optional" selected>ไม่บังคับ (เลือกใช้งานสำหรับบางไซต์)</option>
+                <option value="always">บังคับทุกไซต์งาน</option>
               </select>
+            </div>
+          </div>
+          
+          <div class="card p-24" style="grid-column: 1 / -1;">
+            <h3 class="card-title"><i class="fa-solid fa-palette"></i> ธีม & โลโก้</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;">
+                <div class="form-group">
+                  <label>สีหลักของระบบ (Primary Color)</label>
+                  <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="color" id="st-theme-color" class="form-control" style="width: 60px; height: 40px; padding: 4px;" value="#2563eb" oninput="previewThemeColor(this.value)">
+                    <span class="text-muted" style="font-size: 13px;">แนะนำ: สีแบรนด์องค์กร</span>
+                    <button class="btn btn-outline" style="padding: 4px 12px; font-size: 11px;" onclick="resetThemeColor()">คืนค่าสีตั้งต้น</button>
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>โลโก้โปรแกรม (Sidebar / Header)</label>
+                  <input type="file" id="st-logo-upload" class="form-control" accept="image/*" onchange="previewSettingsImage(this, 'st-logo-preview')">
+                  <img id="st-logo-preview" src="" style="max-height: 48px; margin-top: 8px; display: none; object-fit: contain;">
+                  <button class="btn btn-outline text-danger mt-8" style="padding: 4px 12px; font-size: 11px;" onclick="clearSettingsImage('st-logo')">ลบรูปโลโก้</button>
+                </div>
+                
+                <div class="form-group">
+                  <label>รูปลายน้ำ (Watermark สำหรับเอกสารต่างๆ)</label>
+                  <input type="file" id="st-watermark-upload" class="form-control" accept="image/*" onchange="previewSettingsImage(this, 'st-watermark-preview')">
+                  <img id="st-watermark-preview" src="" style="max-height: 80px; margin-top: 8px; display: none; object-fit: contain; opacity: 0.5;">
+                  <button class="btn btn-outline text-danger mt-8" style="padding: 4px 12px; font-size: 11px;" onclick="clearSettingsImage('st-watermark')">ลบรูปลายน้ำ</button>
+                </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Page: Profile (wip) -->
+      <!-- Page: Profile -->
       <div class="page-content" id="page-profile">
-        <div class="placeholder-box">
-          <h2><i class="fa-regular fa-user"></i> โปรไฟล์</h2>
-          <p>This module will be built in the next phases.</p>
+        <div class="management-header" style="margin-bottom: 24px;">
+          <h2 class="page-title"><i class="fa-regular fa-user"></i> โปรไฟล์ของฉัน</h2>
+        </div>
+
+        <div class="profile-container" style="max-width: 800px; margin: 0 auto; display: grid; gap: 24px;">
+          
+          <!-- Profile Header Card -->
+          <div class="card p-24" style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
+            <div class="profile-avatar" style="position: relative;">
+              <img src="https://ui-avatars.com/api/?name=User&background=2563eb&color=fff" id="profile-img-preview" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 4px solid var(--surface); box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+              <button class="btn-icon" style="position: absolute; bottom: 0; right: 0; background: var(--primary); color: white; width: 32px; height: 32px;" title="เปลี่ยนรูปโปรไฟล์"><i class="fa-solid fa-camera"></i></button>
+            </div>
+            <div class="profile-title-info" style="flex: 1;">
+              <h3 id="profile-display-name" style="font-size: 24px; margin-bottom: 4px;">กำลังโหลด...</h3>
+              <p id="profile-display-role" class="text-muted" style="margin-bottom: 8px;">-</p>
+              <span id="profile-display-status" class="badge badge-success">ใช้งาน</span>
+            </div>
+          </div>
+
+          <!-- Edit Form Card -->
+          <div class="card p-24">
+            <h4 style="margin-bottom: 20px; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;"><i class="fa-solid fa-address-card" style="color: var(--primary);"></i> ข้อมูลส่วนตัว</h4>
+            
+            <form id="profile-form" onsubmit="event.preventDefault(); saveProfileData();">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                
+                <div class="form-group">
+                  <label>รหัสพนักงาน (ไม่สามารถแก้ไขได้)</label>
+                  <input type="text" id="prof-empid" class="form-control" disabled style="background-color: var(--bg-main);">
+                </div>
+
+                <div class="form-group">
+                  <label>ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+                  <input type="text" id="prof-name" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                  <label>อีเมล</label>
+                  <input type="email" id="prof-email" class="form-control">
+                </div>
+
+                <div class="form-group">
+                  <label>บทบาท (ไม่สามารถแก้ไขได้)</label>
+                  <input type="text" id="prof-role" class="form-control" disabled style="background-color: var(--bg-main);">
+                </div>
+
+                <div class="form-group">
+                  <label>เบอร์โทรศัพท์ติดต่อ</label>
+                  <input type="tel" id="prof-phone" class="form-control" placeholder="08X-XXX-XXXX">
+                </div>
+
+                <div class="form-group">
+                  <label>แผนก / ฝ่าย</label>
+                  <input type="text" id="prof-department" class="form-control" placeholder="เช่น ไอที, ฝ่ายขาย">
+                </div>
+                
+                <div class="form-group" style="grid-column: 1 / -1; margin-top: 12px;">
+                  <label>ลายเซ็นอิเล็กทรอนิกส์ (อัปโหลด หรือ เซ็นด้วยเมาส์/นิ้ว)</label>
+                  <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: start; background: var(--bg-main); padding: 12px; border-radius: 8px;">
+                    <div style="flex: 1; min-width: 300px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+                      <canvas id="signature-canvas" width="400" height="150" style="width: 100%; touch-action: none; cursor: crosshair;"></canvas>
+                      <div style="background: #f8fafc; padding: 8px; border-top: 1px solid var(--border); display: flex; justify-content: space-between;">
+                        <button type="button" class="btn-icon" style="padding: 4px 8px; font-size: 11px; background: white; border: 1px solid #ddd; border-radius: 4px;" onclick="clearSignature()"><i class="fa-solid fa-eraser"></i> ล้างลายเซ็นที่วาด</button>
+                        <small class="text-muted" style="line-height: 24px; font-size: 11px;">*เซ็นในกรอบด้านบน (ใช้ยืนยันเอกสาร)</small>
+                      </div>
+                    </div>
+                    <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; background: white; border: 1px dashed var(--border); border-radius: 8px;">
+                      <img id="saved-signature-preview" src="" style="max-width: 100%; max-height: 80px; display: none;" alt="Saved Signature">
+                      <p id="no-signature-text" class="text-muted" style="font-size: 12px; margin: 0;">ยังไม่มีลายเซ็นในระบบ</p>
+                    </div>
+                  </div>
+                  <input type="hidden" id="prof-signature_base64">
+                </div>
+
+              </div>
+              
+              <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border); padding-top: 16px;">
+                <button type="button" class="btn btn-outline" onclick="loadProfileData()"><i class="fa-solid fa-rotate-left"></i> รีเซ็ต</button>
+                <button type="submit" class="btn btn-primary" id="btn-save-profile"><i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูล</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Password Reset Card -->
+          <div class="card p-24">
+            <h4 style="margin-bottom: 20px; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;"><i class="fa-solid fa-lock" style="color: var(--warning);"></i> ความปลอดภัย</h4>
+            <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">หากต้องการเปลี่ยนรหัสผ่าน กรุณากดปุ่มด้านล่าง ระบบจะส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปยังอีเมลของคุณ</p>
+            <button class="btn btn-outline" onclick="requestPasswordReset()"><i class="fa-solid fa-envelope"></i> ส่งลิงก์รีเซ็ตรหัสผ่าน</button>
+          </div>
+
         </div>
       </div>
 
@@ -836,6 +1025,27 @@
                 <option value="ใช้งาน">ใช้งาน</option>
                 <option value="ระงับ">ระงับ</option>
               </select>
+            </div>
+            <div class="form-group mb-16">
+              <label>สิทธิ์การเข้าถึงเมนู</label>
+              <div class="permissions-list" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border); padding: 8px; border-radius: 6px; background: white; font-size: 13px;">
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="dashboard" checked> Dashboard</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="checkin" checked> เช็คอิน/เช็คเอาท์</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="records" checked> บันทึกการเข้างาน</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="map" checked> แผนที่</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="shifts" checked> ดูตารางกะงาน</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="manage-shifts"> จัดตารางกะงาน</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="my-requests" checked> รายการคำขอ</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="approve-requests"> อนุมัติคำขอ</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="approve-leave"> อนุมัติการลา</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="report-general"> รายงานทั่วไป</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="report-leave"> รายงานการลา</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="audit-log"> Audit Log</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="users"> จัดการผู้ใช้</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="workplaces"> จัดการหน้างาน</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="auto-escalation"> Auto-Escalation</label>
+                <label style="display:block; margin-bottom: 4px;"><input type="checkbox" name="u-perms" value="settings"> ตั้งค่าระบบ</label>
+              </div>
             </div>
           </form>
         </div>
@@ -1045,6 +1255,78 @@
           <button class="btn btn-outline" onclick="closeModal('create-request-modal')">ยกเลิก</button>
           <button class="btn btn-primary" onclick="submitMyRequest()"><i class="fa-solid fa-paper-plane"></i>
             ส่งคำขอ</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Document Modal for PDF Export -->
+    <div id="view-doc-modal" class="modal-overlay">
+      <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+          <h3 id="view-doc-modal-title">ใบคำขอ / เอกสาร</h3>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-primary" onclick="exportDocToPDF()"><i class="fa-solid fa-file-pdf"></i> ดาวน์โหลด PDF</button>
+            <button class="btn-icon" onclick="closeModal('view-doc-modal')"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+        <div class="modal-body" style="background: #e2e8f0; padding: 24px; max-height: 70vh; overflow-y: auto;">
+          <!-- A4 Paper Container -->
+          <div id="pdf-export-container" style="background: white; padding: 40px; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-family: 'Noto Sans Thai', sans-serif; color: black; margin: 0 auto; width: 100%; max-width: 210mm; min-height: 297mm; position: relative; box-sizing: border-box;">
+            
+            <div style="text-align: center; margin-bottom: 30px;">
+               <div style="font-size: 28px; color: var(--primary); margin-bottom: 8px;"><i class="fa-solid fa-mountain-sun"></i></div>
+              <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 4px;" id="doc-type-title">ใบคำขอลางาน (Leave Request Form)</h2>
+              <p style="font-size: 14px; color: #555;">บริษัท นีโอ เน็ตเวิร์ค จำกัด</p>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 13px;">
+              <div><strong>รหัสเอกสาร:</strong> <span id="doc-req-id">-</span></div>
+              <div><strong>วันที่ยื่นคำขอ:</strong> <span id="doc-req-date">-</span></div>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 13px;">
+              <tr>
+                <td style="padding: 10px; border: 1px solid #ddd; width: 30%; background: #f8fafc;"><strong>ชื่อพนักงาน:</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;" id="doc-emp-name">-</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; border: 1px solid #ddd; background: #f8fafc;"><strong>รายการ/ประเภท:</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;" id="doc-req-type">-</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; border: 1px solid #ddd; background: #f8fafc;"><strong>รายละเอียด/เหตุผล:</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;" id="doc-req-reason">-</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; border: 1px solid #ddd; background: #f8fafc;"><strong>ระยะเวลา/วันที่:</strong></td>
+                <td style="padding: 10px; border: 1px solid #ddd;" id="doc-req-duration">-</td>
+              </tr>
+            </table>
+
+            <div style="margin-top: 60px; display: flex; justify-content: space-around;">
+              
+              <div style="text-align: center; width: 220px;">
+                <div style="height: 100px; display: flex; align-items: end; justify-content: center; margin-bottom: 8px; border-bottom: 1px dashed #ccc; padding-bottom: 8px;">
+                  <img id="doc-requester-sign" src="" style="max-width: 100%; max-height: 80px; display: none;">
+                  <span id="doc-requester-no-sign" style="color: #999; font-size: 12px; font-style: italic;">(ไม่มีลายเซ็น ลายมือชื่ออิเล็กทรอนิกส์)</span>
+                </div>
+                <p style="margin: 0; font-size: 14px; font-weight: bold;" id="doc-requester-name">ลงชื่อ................................</p>
+                <p style="margin: 4px 0 0; font-size: 12px; color: #666;">ผู้ยื่นคำขอ</p>
+              </div>
+
+              <div style="text-align: center; width: 220px;">
+                <div style="height: 100px; display: flex; align-items: end; justify-content: center; margin-bottom: 8px; border-bottom: 1px dashed #ccc; padding-bottom: 8px;">
+                  <img id="doc-approver-sign" src="" style="max-width: 100%; max-height: 80px; display: none;">
+                  <span id="doc-approver-no-sign" style="color: #999; font-size: 12px; font-style: italic;">(ไม่มีลายเซ็น ลายมือชื่ออิเล็กทรอนิกส์)</span>
+                </div>
+                <p style="margin: 0; font-size: 14px; font-weight: bold;" id="doc-approver-name">ลงชื่อ................................</p>
+                <p style="margin: 4px 0 0; font-size: 12px; color: #666;">ผู้อนุมัติ</p>
+                <p style="margin: 4px 0 0; font-size: 11px; color: #666;">สถานะ: <strong id="doc-approval-status">-</strong></p>
+              </div>
+
+            </div>
+
+          </div>
         </div>
       </div>
     </div>

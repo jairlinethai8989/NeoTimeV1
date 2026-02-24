@@ -7,6 +7,7 @@ CREATE TABLE public.profiles (
     username TEXT UNIQUE,
     role TEXT DEFAULT 'พนักงาน' CHECK (role IN ('พนักงาน', 'หัวหน้างาน', 'HR Admin')),
     primary_shift TEXT,
+    accessible_menus JSONB DEFAULT '["dashboard", "checkin", "records", "map", "shifts", "my-requests", "profile"]'::jsonb,
     status TEXT DEFAULT 'ใช้งาน' CHECK (status IN ('ใช้งาน', 'ระงับ')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
