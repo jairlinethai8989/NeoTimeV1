@@ -1259,7 +1259,9 @@ function selectDate(dateStr, cellElement) {
     card.style.display = 'block';
 }
 
-// ─── MANAGE SHIFTS (AI GENERATION) ───
+// ─── MANAGE SHIFTS (MANUAL & AI) ───
+let manualShiftData = [];
+
 function loadManageShifts() {
     // Just refresh the header text for the month
     const year = currentManageMonth.getFullYear();
@@ -1267,13 +1269,116 @@ function loadManageShifts() {
     const monthNames = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
     document.getElementById('manage-month-year').textContent = `${monthNames[month]} ${year}`;
     
-    // Reset table
-    document.getElementById('manage-shifts-table-container').innerHTML = `
-        <div style="text-align:center; padding: 40px; color: var(--text-muted);">
+    // Default empty on load
+    manualShiftData = [];
+    renderManageShiftsTable();
+}
+
+function renderManageShiftsTable() {
+    const daysInMon = new Date(currentManageMonth.getFullYear(), currentManageMonth.getMonth() + 1, 0).getDate();
+    let headerHtml = '<th style="position: sticky; left: 0; background: var(--bg-body); z-index: 2;">พนักงาน</th>';
+    for(let d=1; d<=daysInMon; d++) {
+        headerHtml += `<th style="text-align:center; min-width: 50px; font-weight: normal; font-size: 11px;">${d}</th>`;
+    }
+    headerHtml += '<th>ลบ</th>';
+
+    let bodyHtml = '';
+    if(manualShiftData.length === 0) {
+        bodyHtml = `<tr><td colspan="${daysInMon + 2}" style="text-align:center; padding: 40px; color: var(--text-muted);">
             <i class="fa-solid fa-calendar-days" style="font-size: 48px; margin-bottom: 16px; color: #cbd5e1;"></i>
-            <p>กดปุ่ม "จัดตารางด้วย AI" เพื่อสร้างตารางกะงานของเดือนนี้</p>
+            <p>ยังไม่มีพนักงานในตาราง คลิก 'เลือกพนักงานลงตาราง' หรือ 'AI จัดกะให้อัตโนมัติ'</p>
+        </td></tr>`;
+    } else {
+        manualShiftData.forEach((empRow, empIdx) => {
+             bodyHtml += `<tr><td style="position: sticky; left: 0; background: #fff; z-index: 1;"><strong>${empRow.empName}</strong></td>`;
+             for(let d=1; d<=daysInMon; d++) {
+                 let shiftVal = empRow.shifts[d-1] || 'O';
+                 let color = shiftVal==='O'?'var(--text-muted)': (shiftVal==='N'?'var(--primary)': (shiftVal==='M'?'var(--success)': 'var(--warning)'));
+                 bodyHtml += `<td style="text-align:center; padding: 0;">
+                    <select class="form-control" style="width:100%; height:100%; border:none; padding: 8px 4px; background: transparent; font-weight:bold; color:${color}; cursor:pointer; text-align:center; appearance: none;" onchange="updateManualShift(${empIdx}, ${d-1}, this.value)">
+                      <option value="M" ${shiftVal==='M'?'selected':''} style="color:var(--success)">M</option>
+                      <option value="A" ${shiftVal==='A'?'selected':''} style="color:var(--warning)">A</option>
+                      <option value="N" ${shiftVal==='N'?'selected':''} style="color:var(--primary)">N</option>
+                      <option value="O" ${shiftVal==='O'?'selected':''} style="color:var(--text-muted)">O</option>
+                    </select>
+                 </td>`;
+             }
+             bodyHtml += `<td style="text-align:center;"><button class="btn-icon text-danger" onclick="removeEmpFromShift(${empIdx})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+        });
+    }
+
+    const container = document.getElementById('manage-shifts-table-container');
+    container.innerHTML = `
+        <div style="padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display:flex; gap:8px;">
+                <span style="font-size:13px;" class="text-muted"><strong class="text-success">M</strong>=เช้า, <strong class="text-warning">A</strong>=บ่าย, <strong class="text-primary">N</strong>=ดึก, <strong>O</strong>=หยุด</span>
+            </div>
+            ${manualShiftData.length > 0 ? `
+            <div style="display:flex; gap:8px;">
+               <button class="btn btn-outline text-warning" onclick="validateManualShifts()"><i class="fa-solid fa-shield-halved"></i> ตรวจสอบเงื่อนไข</button>
+               <button class="btn btn-primary" onclick="alert('บันทึกการจัดกะสำเร็จ ระบบจะอัปเดตไปยังปฏิทินของพนักงานแต่ละคน')"><i class="fa-solid fa-save"></i> บันทึกและประกาศกะ</button>
+            </div>
+            ` : ''}
+        </div>
+        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+            <table class="data-table" style="font-size: 13px; text-align: center; white-space: nowrap;">
+                <thead><tr>${headerHtml}</tr></thead>
+                <tbody>${bodyHtml}</tbody>
+            </table>
         </div>
     `;
+}
+
+function updateManualShift(empIdx, dayIdx, val) {
+    manualShiftData[empIdx].shifts[dayIdx] = val;
+    renderManageShiftsTable(); // Re-render for colors
+}
+
+function removeEmpFromShift(empIdx) {
+    manualShiftData.splice(empIdx, 1);
+    renderManageShiftsTable();
+}
+
+function addEmployeeToShiftTable() {
+    let usersList = usersData.map(u => u.name).filter(n => n);
+    if(usersList.length === 0) usersList = ['สมชาย ใจดี', 'สุดา รักดี', 'วินัย มั่นคง'];
+
+    const pick = prompt("กรุณาระบุชื่อพนักงานที่ต้องการเพิ่มลงในตารางกะ:\\n" + usersList.join(", "));
+    if(!pick) return;
+
+    // Check if exists
+    if(manualShiftData.find(e => e.empName === pick)) {
+         return alert("พนักงานคนนี้อยู่ในตารางแล้ว");
+    }
+
+    const daysInMon = new Date(currentManageMonth.getFullYear(), currentManageMonth.getMonth() + 1, 0).getDate();
+    manualShiftData.push({
+        empName: pick,
+        shifts: Array(daysInMon).fill('O')
+    });
+    renderManageShiftsTable();
+}
+
+function validateManualShifts() {
+    const rules = [];
+    document.querySelectorAll('#shift-conditions-list .condition-item').forEach(item => {
+        const isActive = item.querySelector('input[type="checkbox"]').checked;
+        if(isActive) rules.push(item);
+    });
+
+    if (rules.length === 0) {
+        return alert("ตารางถูกต้อง: ไม่มีการกำหนดเงื่อนไขควบคุมไว้");
+    }
+
+    // Mock validation logic
+    // Just simulating a pass or fail random chance based on UI, 
+    // real app would compute constraint logic per rule
+    const isPassing = Math.random() > 0.3; // 70% chance pass
+    if (isPassing) {
+         alert("✅ ตารางยอดเยี่ยม! จัดตารางได้ถูกต้องตามเงื่อนไขทุกข้อ");
+    } else {
+         alert("❌ พบข้อผิดพลาด! มีการจัดกะผิดเงื่อนไข กรุณาตรวจสอบจำนวนคนเข้ากะ หรือกะติดต่อกัน");
+    }
 }
 
 function changeManageMonth(dir) {
@@ -1308,13 +1413,7 @@ function generateAIShifts() {
     // Collect specific active rules
     const rules = [];
     document.querySelectorAll('#shift-conditions-list .condition-item').forEach(item => {
-        const isActive = item.querySelector('input[type="checkbox"]').checked;
-        if(isActive) {
-            rules.push({
-                type: item.querySelector('select').options[item.querySelector('select').selectedIndex].text,
-                val: item.querySelector('input[type="text"]').value || '(ไม่ระบุ)'
-            });
-        }
+        if(item.querySelector('input[type="checkbox"]').checked) rules.push(1);
     });
 
     if (rules.length === 0) {
@@ -1333,50 +1432,27 @@ function generateAIShifts() {
     `;
 
     setTimeout(() => {
-        // Mock generating a table
+        // AI populating the manual table data
         const daysInMon = new Date(currentManageMonth.getFullYear(), currentManageMonth.getMonth() + 1, 0).getDate();
         
-        let headerHtml = '<th>พนักงาน</th>';
-        for(let d=1; d<=daysInMon; d++) {
-            headerHtml += `<th style="text-align:center; min-width: 40px;">${d}</th>`;
-        }
+        let emps = usersData.map(u => u.name).filter(n => n);
+        if(emps.length === 0) emps = ['สมชาย ใจดี', 'สุดา รักดี', 'วินัย มั่นคง'];
 
-        const emps = ['สมชาย ใจดี', 'สุดา รักดี', 'วินัย มั่นคง'];
-        let bodyHtml = '';
-
-        emps.forEach(emp => {
-            bodyHtml += `<tr><td><strong>${emp}</strong></td>`;
+        manualShiftData = emps.map(emp => {
+            const shifts = [];
             for(let d=1; d<=daysInMon; d++) {
-                // Mock random shift
                 const r = Math.random();
-                let txt = 'O'; let color = 'text-muted';
-                if(r > 0.8) { txt = 'N'; color = 'text-primary'; }
-                else if(r > 0.6) { txt = 'M'; color = 'text-success'; }
-                else if(r > 0.2) { txt = 'A'; color = 'text-warning'; }
-                
-                bodyHtml += `<td style="text-align:center;" class="${color}"><strong>${txt}</strong></td>`;
+                let txt = 'O'; 
+                if(r > 0.8) txt = 'N'; 
+                else if(r > 0.6) txt = 'M'; 
+                else if(r > 0.2) txt = 'A'; 
+                shifts.push(txt);
             }
-            bodyHtml += `</tr>`;
+            return { empName: emp, shifts: shifts };
         });
 
-        container.innerHTML = `
-            <div style="padding: 16px; background: #ecfdf5; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <div><i class="fa-solid fa-circle-check text-success"></i> <strong>สร้างตารางสำเร็จ</strong><span class="text-muted"> โดยวิเคราะห์จาก ${rules.length} เงื่อนไข</span></div>
-                <div style="display:flex; gap:8px;">
-                    <span style="font-size:12px;" class="text-muted">M=เช้า, A=บ่าย, N=ดึก, O=หยุด</span>
-                </div>
-            </div>
-            <div class="table-responsive">
-                <table class="data-table" style="font-size: 13px;">
-                    <thead><tr>${headerHtml}</tr></thead>
-                    <tbody>${bodyHtml}</tbody>
-                </table>
-            </div>
-            <div style="padding: 16px; text-align: right;">
-                <button class="btn btn-outline" onclick="loadManageShifts()"><i class="fa-solid fa-rotate-left"></i> เริ่มใหม่</button>
-                <button class="btn btn-primary" onclick="alert('บันทึกการจัดกะสำเร็จ ระบบจะอัปเดตไปยังปฏิทินของพนักงานแต่ละคน')"><i class="fa-solid fa-save"></i> บันทึกและประกาศกะ</button>
-            </div>
-        `;
+        alert("AI จัดตารางให้เรียบร้อยแล้ว หากพบจุดใดไม่สมบูรณ์ คุณสามารถปรับเปลี่ยนแบบ Manual ในตารางได้ทันที");
+        renderManageShiftsTable();
     }, 2500);
 }
 

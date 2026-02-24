@@ -467,10 +467,11 @@
       <!-- Page: Manage Shifts -->
       <div class="page-content" id="page-manage-shifts">
         <div class="management-header">
-          <h2 class="page-title"><i class="fa-solid fa-calendar-plus"></i> จัดตารางกะงานด้วย AI</h2>
-          <button class="btn btn-primary" onclick="generateAIShifts()">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> จัดตารางด้วย AI
-          </button>
+          <h2 class="page-title"><i class="fa-solid fa-calendar-plus"></i> จัดตารางกะงาน (Manual & AI)</h2>
+          <div>
+            <button class="btn btn-outline" onclick="addEmployeeToShiftTable()"><i class="fa-solid fa-user-plus"></i> เลือกพนักงานลงตาราง</button>
+            <button class="btn btn-primary" style="margin-left: 8px;" onclick="generateAIShifts()"><i class="fa-solid fa-wand-magic-sparkles"></i> AI จัดกะให้อัตโนมัติ</button>
+          </div>
         </div>
         
         <div class="card p-0" style="margin-bottom: 24px;">
