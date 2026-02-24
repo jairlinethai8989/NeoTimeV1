@@ -37,6 +37,15 @@
     --radius-lg: 16px;
 }
 
+[data-theme="dark"] {
+    --bg-main: #0f172a;
+    --surface: #1e293b;
+    --border: #334155;
+    --text-main: #f8fafc;
+    --text-body: #e2e8f0;
+    --text-muted: #94a3b8;
+}
+
 /* Reset Component */
 * {
     margin: 0;

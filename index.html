@@ -371,13 +371,15 @@
       </div>
 
       <!-- Page: Map -->
-      <div class="page-content" id="page-map" style="display: flex; flex-direction: column; height: calc(100vh - var(--header-h) - 48px);">
-        <div class="management-header" style="margin-bottom: 16px;">
-          <h2 class="page-title"><i class="fa-solid fa-map-location-dot"></i> แผนที่และการกระจายตัว</h2>
-          <button class="btn btn-outline" onclick="loadMap()"><i class="fa-solid fa-arrows-rotate"></i> รีเฟรชพิกัด</button>
-        </div>
-        <div class="card p-0" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; border-radius: var(--radius-lg); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-          <div id="main-leaflet-map" style="width: 100%; height: 100%; z-index: 1;"></div>
+      <div class="page-content" id="page-map">
+        <div style="display: flex; flex-direction: column; height: calc(100vh - var(--header-h) - 48px);">
+            <div class="management-header" style="margin-bottom: 16px;">
+              <h2 class="page-title"><i class="fa-solid fa-map-location-dot"></i> แผนที่และการกระจายตัว</h2>
+              <button class="btn btn-outline" onclick="loadMap()"><i class="fa-solid fa-arrows-rotate"></i> รีเฟรชพิกัด</button>
+            </div>
+            <div class="card p-0" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; border-radius: var(--radius-lg); box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+              <div id="main-leaflet-map" style="width: 100%; height: 100%; z-index: 1;"></div>
+            </div>
         </div>
       </div>
 
@@ -824,9 +826,9 @@
             <div class="form-group mb-16">
               <label>เวลาทำงานปกติ (เข้า - ออก)</label>
               <div style="display:flex; gap:12px;">
-                <input type="time" class="form-control" id="st-time-in" value="09:00" />
+                <input type="text" class="form-control" id="st-time-in" value="09:00" placeholder="HH:mm" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" />
                 <span style="display:flex; align-items:center;">-</span>
-                <input type="time" class="form-control" id="st-time-out" value="18:00" />
+                <input type="text" class="form-control" id="st-time-out" value="18:00" placeholder="HH:mm" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" />
               </div>
             </div>
             <div class="form-group">
@@ -857,12 +859,11 @@
             <h3 class="card-title"><i class="fa-solid fa-palette"></i> ธีม & โลโก้</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;">
                 <div class="form-group">
-                  <label>สีหลักของระบบ (Primary Color)</label>
-                  <div style="display: flex; gap: 12px; align-items: center;">
-                    <input type="color" id="st-theme-color" class="form-control" style="width: 60px; height: 40px; padding: 4px;" value="#2563eb" oninput="previewThemeColor(this.value)">
-                    <span class="text-muted" style="font-size: 13px;">แนะนำ: สีแบรนด์องค์กร</span>
-                    <button class="btn btn-outline" style="padding: 4px 12px; font-size: 11px;" onclick="resetThemeColor()">คืนค่าสีตั้งต้น</button>
-                  </div>
+                  <label>ธีมของระบบ (Theme)</label>
+                  <select id="st-theme-mode" class="form-control" onchange="previewThemeMode(this.value)">
+                    <option value="light">สว่าง (Light Mode)</option>
+                    <option value="dark">มืด (Dark Mode)</option>
+                  </select>
                 </div>
 
                 <div class="form-group">

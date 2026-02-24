@@ -2441,16 +2441,17 @@ function exportDocToPDF() {
 // ─── SYSTEM SETTINGS (THEME & LOGO) ───
 
 function loadSystemSettings() {
-    const defaultColor = '#2563eb';
-    
-    // Load simple local settings (in a real app, load from DB)
     const lsSettings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
     
     // 1. Apply Theme
-    const color = lsSettings.themeColor || defaultColor;
-    document.documentElement.style.setProperty('--primary', color);
-    const themeInput = document.getElementById('st-theme-color');
-    if(themeInput) themeInput.value = color;
+    const themeMode = lsSettings.themeMode || 'light';
+    if(themeMode === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+    const themeInput = document.getElementById('st-theme-mode');
+    if(themeInput) themeInput.value = themeMode;
 
     // 2. Apply Custom Logo
     const logoBase64 = lsSettings.logoBase64;
@@ -2461,13 +2462,12 @@ function loadSystemSettings() {
             logoPreview.src = logoBase64;
             logoPreview.style.display = 'block';
         }
-        // Apply to sidebar
         if (sidebarLogoText) {
             sidebarLogoText.innerHTML = `<img src="${logoBase64}" style="max-height: 28px; margin-right: 8px; vertical-align: middle;"> Gravity`;
         }
     } else {
         if (sidebarLogoText && sidebarLogoText.innerHTML.includes('<img')) {
-            sidebarLogoText.innerHTML = `<i class="fa-solid fa-clock"></i> NeoTime`; // Reset back to default if no logo just in case
+            sidebarLogoText.innerHTML = `<i class="fa-solid fa-clock"></i> NeoTime`;
         }
     }
 
@@ -2480,14 +2480,18 @@ function loadSystemSettings() {
             wmPreview.src = watermarkBase64;
             wmPreview.style.display = 'block';
         }
-        // Apply as body background
         if(wrapper) {
            wrapper.style.backgroundImage = `url('${watermarkBase64}')`;
            wrapper.style.backgroundRepeat = 'repeat';
            wrapper.style.backgroundPosition = 'center';
            wrapper.style.backgroundSize = '200px'; 
            wrapper.style.backgroundBlendMode = 'overlay';
-           wrapper.style.backgroundColor = 'rgba(255, 255, 255, 0.9)'; // Ensure content is readable
+           // Dark mode contrast helper
+           if(themeMode === 'dark') {
+                wrapper.style.backgroundColor = 'rgba(30, 41, 59, 0.9)';
+           } else {
+                wrapper.style.backgroundColor = 'rgba(255, 255, 255, 0.9)'; 
+           }
         }
     } else {
         if(wrapper) {
@@ -2519,10 +2523,9 @@ function saveSystemSettings() {
             lateGrace: document.getElementById('st-late-grace')?.value,
             wifi: document.getElementById('st-wifi')?.value,
             photo: document.getElementById('st-photo')?.value,
-            themeColor: document.getElementById('st-theme-color')?.value
+            themeMode: document.getElementById('st-theme-mode')?.value
         };
 
-        // Get images from previews if displayed
         const logoPreview = document.getElementById('st-logo-preview');
         if (logoPreview && logoPreview.style.display !== 'none' && logoPreview.src) {
              newSettings.logoBase64 = logoPreview.src;
@@ -2537,34 +2540,71 @@ function saveSystemSettings() {
              delete newSettings.watermarkBase64;
         }
 
-        localStorage.setItem('systemAdminSettings', JSON.stringify(newSettings));
-
-        setTimeout(() => {
+        try {
+            localStorage.setItem('systemAdminSettings', JSON.stringify(newSettings));
+            setTimeout(() => {
+                loadSystemSettings();
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+                alert('บันทึกการตั้งค่าระบบเรียบร้อยแล้ว');
+            }, 600);
+        } catch(e) {
             btn.innerHTML = originalHtml;
             btn.disabled = false;
-            loadSystemSettings(); // Re-apply global settings UI
-            alert('บันทึกการตั้งค่าระบบเรียบร้อยแล้ว');
-        }, 800);
+            alert('ไม่สามารถบันทึกได้ รูปภาพอาจมีขนาดใหญ่เกินไป โปรดเลือกลบแล้วอัปโหลดรูปที่เล็กลง');
+            console.error(e);
+        }
     });
 }
 
-function previewThemeColor(colorHex) {
-    document.documentElement.style.setProperty('--primary', colorHex);
-}
-
-function resetThemeColor() {
-    const defaultColor = '#2563eb';
-    previewThemeColor(defaultColor);
-    document.getElementById('st-theme-color').value = defaultColor;
+function previewThemeMode(mode) {
+    if(mode === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        const wrapper = document.querySelector('.main-content');
+        if (wrapper && wrapper.style.backgroundImage !== 'none') {
+             wrapper.style.backgroundColor = 'rgba(30, 41, 59, 0.9)';
+        }
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        const wrapper = document.querySelector('.main-content');
+        if (wrapper && wrapper.style.backgroundImage !== 'none') {
+             wrapper.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+        }
+    }
 }
 
 function previewSettingsImage(input, previewId) {
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            const preview = document.getElementById(previewId);
-            preview.src = e.target.result;
-            preview.style.display = 'block';
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const MAX_SIZE = 600; 
+                if (width > height) {
+                    if (width > MAX_SIZE) {
+                        height *= MAX_SIZE / width;
+                        width = MAX_SIZE;
+                    }
+                } else {
+                    if (height > MAX_SIZE) {
+                        width *= MAX_SIZE / height;
+                        height = MAX_SIZE;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85); // Compress heavily
+                
+                const preview = document.getElementById(previewId);
+                preview.src = dataUrl;
+                preview.style.display = 'block';
+            };
+            img.src = e.target.result;
         }
         reader.readAsDataURL(input.files[0]);
     }
@@ -2578,7 +2618,6 @@ function clearSettingsImage(type) {
         preview.src = '';
         preview.style.display = 'none';
         
-        // Remove from UI visually until saved
         if(type === 'st-logo') {
             const sidebarLogoText = document.querySelector('.sidebar-header h2');
             if (sidebarLogoText && sidebarLogoText.innerHTML.includes('<img')) {
