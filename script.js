@@ -78,6 +78,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ฟังก์ชันดึงข้อมูลพนักงานปัจจุบันที่ล็อกอินอยู่
 async function loadCurrentUserProfile(uid) {
     try {
+        // Always set uuid from the auth session first
+        MOCK_USER.uuid = uid;
+        
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -87,22 +90,27 @@ async function loadCurrentUserProfile(uid) {
         if (error) throw error;
 
         if (data) {
-            MOCK_USER.id = data.employee_id;
-            MOCK_USER.uuid = data.id;
-            MOCK_USER.name = data.full_name;
-            MOCK_USER.role = data.role;
+            MOCK_USER.id = data.employee_id || '';
+            MOCK_USER.name = data.full_name || '';
+            MOCK_USER.role = data.role || 'พนักงาน';
             MOCK_USER.permissions = data.accessible_menus || ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
 
             applyUserPermissions();
 
-            // อัปเดตแสดงผลที่ Header ของเบราว์เซอร์
             const nameEl = document.getElementById('user-display-name');
             const roleEl = document.getElementById('user-display-role');
             if (nameEl) nameEl.textContent = data.full_name;
             if (roleEl) roleEl.textContent = data.role;
+        } else {
+            // Profile not found but user is authenticated
+            MOCK_USER.permissions = ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
+            applyUserPermissions();
         }
     } catch (e) {
         console.error("Error loading user profile:", e);
+        // Still keep uuid from auth so check-in works
+        MOCK_USER.permissions = ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
+        applyUserPermissions();
     }
 }
 
@@ -425,7 +433,10 @@ async function submitCheckin(type) {
         const distance = 0;
         const status = 'ปกติ';
 
-        const realUserId = MOCK_USER.uuid; 
+        const realUserId = MOCK_USER.uuid;
+        if (!realUserId) {
+            throw new Error('ไม่พบข้อมูลผู้ใช้ กรุณาล็อกอินใหม่');
+        }
         
         let finalNote = note;
         if (checkinCategory !== 'เวลาปกติ') {
@@ -955,14 +966,38 @@ async function saveUser() {
                 .update(payload)
                 .eq('employee_id', orgId);
             if (error) throw error;
+            alert('แก้ไขข้อมูลสำเร็จ!');
         } else {
-            // Try Supabase insert first
-            const { error } = await supabase
-                .from('profiles')
-                .insert([payload]);
-            if (error) {
-                // Fallback: save to localStorage  
-                console.warn('Supabase insert failed, saving locally:', error.message);
+            // For new employees: try to create auth user first, then insert profile
+            let insertSuccess = false;
+            
+            if (payload.email) {
+                // Create auth user with email + default password
+                const defaultPassword = payload.employee_id + '@Neo2026';
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email: payload.email,
+                    password: defaultPassword
+                });
+                
+                if (!authError && authData?.user) {
+                    // Now insert profile with the auth user's id
+                    const profilePayload = { ...payload, id: authData.user.id };
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .upsert([profilePayload]);
+                    
+                    if (profileError) {
+                        console.warn('Profile insert error:', profileError.message);
+                    } else {
+                        insertSuccess = true;
+                    }
+                } else {
+                    console.warn('Auth signUp failed:', authError?.message);
+                }
+            }
+            
+            if (!insertSuccess) {
+                // Fallback: save to localStorage for testing
                 const localUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
                 localUsers.push({
                     id: 'local-' + Date.now(),
@@ -970,13 +1005,22 @@ async function saveUser() {
                     created_at: new Date().toISOString()
                 });
                 localStorage.setItem('localUsers', JSON.stringify(localUsers));
+                console.log('User saved to localStorage (fallback)');
             }
+            alert('บันทึกสำเร็จ!');
         }
-        alert('บันทึกสำเร็จ!');
         loadUsers();
     } catch (error) {
         console.error('Error saving user:', error.message);
-        alert('Error: ' + error.message);
+        // Still save locally as fallback
+        const localUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
+        localUsers.push({
+            id: 'local-' + Date.now(),
+            ...payload,
+            created_at: new Date().toISOString()
+        });
+        localStorage.setItem('localUsers', JSON.stringify(localUsers));
+        alert('บันทึกในเครื่อง (ออฟไลน์) สำเร็จ! (Supabase: ' + error.message + ')');
         loadUsers();
     }
 }
@@ -1323,22 +1367,26 @@ let swapRequestsList = []; // mock DB for swap requests
 
 function loadShifts() {
     renderCalendar();
-    loadSwapRequests(); // load pending swaps badge
+    loadSwapRequests();
 
-    // Generate some mock shift data for the current user
     const y = currentShiftsDate.getFullYear();
     const m = currentShiftsDate.getMonth();
     myShiftsMap = {};
 
-    // Mock: Add random shifts
-    for (let i = 1; i <= 28; i++) {
-        if (i % 7 === 0) myShiftsMap[`${y}-${(m + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`] = { type: 'off', label: 'วันหยุด' };
-        else if (i % 3 === 0) myShiftsMap[`${y}-${(m + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`] = { type: 'morning', label: '08:00 - 17:00' };
-        else if (i % 5 === 0) myShiftsMap[`${y}-${(m + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`] = { type: 'afternoon', label: '14:00 - 23:00' };
-        else myShiftsMap[`${y}-${(m + 1).toString().padStart(2, '0')}-${i.toString().padStart(2, '0')}`] = { type: 'morning', label: '08:00 - 17:00' };
+    // Load shift assignments from localStorage (saved by manage-shifts)
+    try {
+        const saved = JSON.parse(localStorage.getItem('shiftAssignments') || '{}');
+        Object.keys(saved).forEach(dateStr => {
+            const ds = new Date(dateStr);
+            if (ds.getFullYear() === y && ds.getMonth() === m) {
+                const assignment = saved[dateStr];
+                myShiftsMap[dateStr] = assignment;
+            }
+        });
+    } catch(e) {
+        console.warn('Could not load shift assignments:', e);
     }
 
-    // Refresh UI
     renderCalendar();
 }
 
@@ -1377,7 +1425,11 @@ function renderCalendar() {
             if (shift.type === 'morning') badgeClass = 'shift-morning';
             else if (shift.type === 'afternoon') badgeClass = 'shift-afternoon';
             else if (shift.type === 'night') badgeClass = 'shift-night';
-            badgeHtml = `<div class="shift-badge ${badgeClass}">${shift.label}</div>`;
+            
+            // Show employee name if available
+            const empName = shift.empName || '';
+            const nameHtml = empName ? `<div style="font-size:9px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${empName}</div>` : '';
+            badgeHtml = `<div class="shift-badge ${badgeClass}">${shift.label}</div>${nameHtml}`;
         }
 
         const cell = document.createElement('div');
@@ -3191,15 +3243,15 @@ function updateWorklogDateDisplay() {
 }
 
 function loadWorklogPage() {
+    console.log('[Worklog] Loading worklog page...');
     wlCurrentDate = new Date();
     const modeEl = document.getElementById('wl-view-mode');
     if(modeEl) modeEl.value = wlViewMode;
     updateWorklogDateDisplay();
     
     try {
-        const drafts = JSON.parse(localStorage.getItem('myWorklog_' + (MOCK_USER?.uuid || '')));
-        // Load them all or filter based on view mode? 
-        // For mock simple logic we just load all saved drafts.
+        const key = 'myWorklog_' + (MOCK_USER?.uuid || 'default');
+        const drafts = JSON.parse(localStorage.getItem(key));
         if(drafts && drafts.entries && drafts.entries.length > 0) {
             worklogEntries = drafts.entries;
             wlCounter = drafts.entries.map(e => parseInt(e.id.split('_')[1]||0)).reduce((a,b)=>Math.max(a,b), 0);
@@ -3209,12 +3261,14 @@ function loadWorklogPage() {
             addWorklogEntry();
         }
     } catch(e) {
+        console.warn('[Worklog] Error loading drafts:', e);
         worklogEntries = [];
         wlCounter = 0;
         addWorklogEntry();
     }
     
     renderWorklog();
+    console.log('[Worklog] Rendered', worklogEntries.length, 'entries');
 }
 
 function addWorklogEntry() {
@@ -3244,6 +3298,14 @@ function updateWorklogData(id, field, value) {
 
 // Global exposure for innerHTML handlers
 window.updateWorklogData = updateWorklogData;
+window.addWorklogEntry = addWorklogEntry;
+window.removeWorklogEntry = removeWorklogEntry;
+window.getStatusColor = getStatusColor;
+window.changeWorklogView = changeWorklogView;
+window.changeWorklogPeriod = changeWorklogPeriod;
+window.saveWorklogDraft = saveWorklogDraft;
+window.exportWorklog = exportWorklog;
+window.sendWorklogMonthly = sendWorklogMonthly;
 
 function getStatusColor(st) {
     if(st === 'Done') return 'var(--success)';
