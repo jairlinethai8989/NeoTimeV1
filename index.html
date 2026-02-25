@@ -178,28 +178,28 @@
             <div class="stat-icon bg-primary-light text-primary"><i class="fa-solid fa-users"></i></div>
             <div class="stat-info">
               <h3>พนักงานทั้งหมด</h3>
-              <div class="stat-val" id="dash-total">120</div>
+              <div class="stat-val" id="dash-total">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon bg-success-light text-success"><i class="fa-solid fa-user-check"></i></div>
             <div class="stat-info">
               <h3>มาทำงานวันนี้</h3>
-              <div class="stat-val" id="dash-present">95</div>
+              <div class="stat-val" id="dash-present">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon bg-warning-light text-warning"><i class="fa-solid fa-clock"></i></div>
             <div class="stat-info">
               <h3>มาสาย</h3>
-              <div class="stat-val" id="dash-late">12</div>
+              <div class="stat-val" id="dash-late">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon bg-danger-light text-danger"><i class="fa-solid fa-user-xmark"></i></div>
             <div class="stat-info">
               <h3>ขาดงาน</h3>
-              <div class="stat-val" id="dash-absent">13</div>
+              <div class="stat-val" id="dash-absent">0</div>
             </div>
           </div>
         </div>
@@ -210,35 +210,35 @@
             <div class="stat-icon bg-info-light text-info"><i class="fa-solid fa-file-contract"></i></div>
             <div class="stat-info">
               <h3>ลางานรวม</h3>
-              <div class="stat-val" id="dash-leave-total">12</div>
+              <div class="stat-val" id="dash-leave-total">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon bg-warning-light text-warning"><i class="fa-solid fa-briefcase"></i></div>
             <div class="stat-info">
               <h3>ลากิจ</h3>
-              <div class="stat-val" id="dash-leave-personal">5</div>
+              <div class="stat-val" id="dash-leave-personal">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon bg-danger-light text-danger"><i class="fa-solid fa-bed"></i></div>
             <div class="stat-info">
               <h3>ลาป่วย</h3>
-              <div class="stat-val" id="dash-leave-sick">3</div>
+              <div class="stat-val" id="dash-leave-sick">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon bg-primary-light text-primary"><i class="fa-solid fa-umbrella-beach"></i></div>
             <div class="stat-info">
               <h3>ลาพักร้อน</h3>
-              <div class="stat-val" id="dash-leave-vacation">4</div>
+              <div class="stat-val" id="dash-leave-vacation">0</div>
             </div>
           </div>
           <div class="stat-card">
             <div class="stat-icon bg-success-light text-success"><i class="fa-solid fa-truck-fast"></i></div>
             <div class="stat-info">
               <h3>ทำงานนอกพื้นที่</h3>
-              <div class="stat-val" id="dash-offsite">18</div>
+              <div class="stat-val" id="dash-offsite">0</div>
             </div>
           </div>
         </div>
@@ -1110,8 +1110,12 @@
               <input type="text" id="u-empid" class="form-control" required>
             </div>
             <div class="form-group mb-16">
-              <label>ชื่อ-นามสกุล <span class="text-danger">*</span></label>
-              <input type="text" id="u-name" class="form-control" required>
+              <label>ชื่อ (ชื่อจริง) <span class="text-danger">*</span></label>
+              <input type="text" id="u-fname" class="form-control" required placeholder="เช่น สมชาย">
+            </div>
+            <div class="form-group mb-16">
+              <label>นามสกุล <span class="text-danger">*</span></label>
+              <input type="text" id="u-lname" class="form-control" required placeholder="เช่น ใจดี">
             </div>
             <div class="form-group mb-16">
               <label>อีเมล</label>

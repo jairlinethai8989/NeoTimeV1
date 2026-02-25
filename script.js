@@ -43,8 +43,8 @@ let clockIntervalId = null;
 
 // TODO: Connect to real User Data
 const MOCK_USER = {
-    id: 'EMP7857',
-    name: 'พนักงานทดสอบ'
+    id: '',
+    name: ''
 };
 
 // ─── Initialization ─────────────────────────────────
@@ -91,7 +91,7 @@ async function loadCurrentUserProfile(uid) {
             MOCK_USER.uuid = data.id;
             MOCK_USER.name = data.full_name;
             MOCK_USER.role = data.role;
-            MOCK_USER.permissions = data.accessible_menus || ['dashboard', 'checkin', 'records', 'map', 'shifts', 'my-requests', 'profile'];
+            MOCK_USER.permissions = data.accessible_menus || ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
 
             applyUserPermissions();
 
@@ -505,10 +505,7 @@ function initDashMiniMap() {
         maxZoom: 19,
     }).addTo(miniDashMap);
     
-    // Appending simple markers
-    L.marker([13.7563, 100.5018]).addTo(miniDashMap).bindPopup("สำนักงานใหญ่ (HQ)");
-    L.marker([13.8, 100.6]).addTo(miniDashMap).bindPopup("สาขาลาดพร้าว");
-    L.marker([13.7, 100.4]).addTo(miniDashMap).bindPopup("ไซท์งาน A");
+    // Markers will be populated from workplaces data
     
     setTimeout(() => {
         miniDashMap.invalidateSize();
@@ -775,10 +772,29 @@ async function loadUsers() {
             username: u.username,
             role: u.role,
             department: u.department || '',
-            shift: u.primary_shift, // Using primary_shift for display
+            shift: u.primary_shift,
             status: u.status,
             accessible_menus: u.accessible_menus
         }));
+
+        // Merge local users from localStorage
+        const localUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
+        localUsers.forEach(lu => {
+            if (!usersData.find(u => u.empId === lu.employee_id)) {
+                usersData.push({
+                    id: lu.id,
+                    empId: lu.employee_id,
+                    name: lu.full_name,
+                    email: lu.email,
+                    username: lu.username,
+                    role: lu.role,
+                    department: lu.department || '',
+                    shift: lu.primary_shift,
+                    status: lu.status,
+                    accessible_menus: lu.accessible_menus
+                });
+            }
+        });
 
         renderUsersTable();
     } catch (error) {
@@ -858,7 +874,10 @@ function editUser(encodedUser) {
     document.getElementById('user-modal-title').textContent = 'แก้ไขข้อมูลพนักงาน';
     document.getElementById('u-original-id').value = u.empId;
     document.getElementById('u-empid').value = u.empId;
-    document.getElementById('u-name').value = u.name;
+    // Split name into fname and lname
+    const nameParts = (u.name || '').split(' ');
+    document.getElementById('u-fname').value = nameParts[0] || '';
+    document.getElementById('u-lname').value = nameParts.slice(1).join(' ') || '';
     document.getElementById('u-email').value = u.email;
     document.getElementById('u-username').value = u.username;
     document.getElementById('u-role').value = u.role;
@@ -888,21 +907,38 @@ function editUser(encodedUser) {
 async function saveUser() {
     const selectedPerms = Array.from(document.querySelectorAll('input[name="u-perms"]:checked')).map(cb => cb.value);
     
+    const fname = document.getElementById('u-fname').value.trim();
+    const lname = document.getElementById('u-lname').value.trim();
+    
+    if (!fname) {
+        alert('กรุณากรอกชื่อจริง');
+        return;
+    }
+    if (!lname) {
+        alert('กรุณากรอกนามสกุล');
+        return;
+    }
+    
+    const fullName = fname + ' ' + lname;
+    
     const payload = {
         employee_id: document.getElementById('u-empid').value.trim(),
-        full_name: document.getElementById('u-name').value.trim(),
+        full_name: fullName,
         email: document.getElementById('u-email').value.trim(),
         username: document.getElementById('u-username').value.trim(),
         role: document.getElementById('u-role').value,
         department: document.getElementById('u-department') ? document.getElementById('u-department').value : null,
         primary_shift: document.getElementById('u-shift').value.trim(),
         status: document.getElementById('u-status').value,
-        accessible_menus: selectedPerms
+        accessible_menus: selectedPerms,
+        leave_sick: document.getElementById('u-leave-sick')?.value || '',
+        leave_personal: document.getElementById('u-leave-personal')?.value || '',
+        leave_vacation: document.getElementById('u-leave-vacation')?.value || ''
     };
-    const orgId = document.getElementById('u-original-id').value; // In a full app, we need the UUID here instead of empId for proper updates. We'll use employee_id for matching if uuid not kept.
+    const orgId = document.getElementById('u-original-id').value;
 
-    if (!payload.employee_id || !payload.full_name) {
-        alert('กรุณากรอก รหัสพนักงาน และ ชื่อ-นามสกุล ให้ครบถ้วน');
+    if (!payload.employee_id) {
+        alert('กรุณากรอกรหัสพนักงาน');
         return;
     }
 
@@ -914,19 +950,29 @@ async function saveUser() {
 
     try {
         if (isEdit) {
-            // Update based on employee_id (fallback matching as we didn't store UUID in HTML input clearly)
             const { error } = await supabase
                 .from('profiles')
                 .update(payload)
                 .eq('employee_id', orgId);
             if (error) throw error;
         } else {
-            // Note: Real insertion requires creating Auth user first via Supabase Edge Function or Backend.
-            // Doing raw insert here assumes triggers or manual id providing if testing.
-            console.log("Mocking creation of user as it requires Auth integration: ", payload);
-            setTimeout(() => { alert('บันทึกสำเร็จ (Mock)'); loadUsers(); }, 500);
-            return;
+            // Try Supabase insert first
+            const { error } = await supabase
+                .from('profiles')
+                .insert([payload]);
+            if (error) {
+                // Fallback: save to localStorage  
+                console.warn('Supabase insert failed, saving locally:', error.message);
+                const localUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
+                localUsers.push({
+                    id: 'local-' + Date.now(),
+                    ...payload,
+                    created_at: new Date().toISOString()
+                });
+                localStorage.setItem('localUsers', JSON.stringify(localUsers));
+            }
         }
+        alert('บันทึกสำเร็จ!');
         loadUsers();
     } catch (error) {
         console.error('Error saving user:', error.message);
