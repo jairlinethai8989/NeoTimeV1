@@ -849,8 +849,7 @@ async function loadUsers() {
             role: u.role,
             department: u.department || '',
             shift: u.primary_shift,
-            status: u.status,
-            accessible_menus: u.accessible_menus
+            status: u.status
         }));
 
         // Merge local users from localStorage
@@ -866,8 +865,7 @@ async function loadUsers() {
                     role: lu.role,
                     department: lu.department || '',
                     shift: lu.primary_shift,
-                    status: lu.status,
-                    accessible_menus: lu.accessible_menus
+                    status: lu.status
                 });
             }
         });
@@ -972,7 +970,7 @@ function editUser(encodedUser) {
     document.getElementById('u-shift').value = u.shift || '';
     document.getElementById('u-status').value = u.status;
     
-    const perms = u.accessible_menus || ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
+    const perms = getPermissionsByRole(u.role);
     document.querySelectorAll('input[name="u-perms"]').forEach(cb => {
         cb.checked = perms.includes(cb.value);
     });
@@ -1009,13 +1007,8 @@ async function saveUser() {
         email: document.getElementById('u-email').value.trim(), // Real email for password reset
         username: username,
         role: document.getElementById('u-role').value,
-        department: document.getElementById('u-department') ? document.getElementById('u-department').value : null,
         primary_shift: document.getElementById('u-shift').value.trim(),
-        status: document.getElementById('u-status').value,
-        accessible_menus: selectedPerms,
-        leave_sick: document.getElementById('u-leave-sick')?.value || '',
-        leave_personal: document.getElementById('u-leave-personal')?.value || '',
-        leave_vacation: document.getElementById('u-leave-vacation')?.value || ''
+        status: document.getElementById('u-status').value
     };
     const orgId = document.getElementById('u-original-id').value;
 
