@@ -946,6 +946,39 @@ select.form-control {
     gap: 12px;
 }
 
+/* ═══ CONFIRM ACTION DIALOG ═══ */
+.confirm-action-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #30a0ff 0%, #007AFF 50%, #5856D6 100%);
+    color: white;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    box-shadow: 0 8px 24px rgba(0, 122, 255, 0.3);
+    animation: confirmPulse 2s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.confirm-action-icon::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 50%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent);
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+@keyframes confirmPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 8px 24px rgba(0, 122, 255, 0.3); }
+    50% { transform: scale(1.05); box-shadow: 0 12px 32px rgba(0, 122, 255, 0.4); }
+}
+
 /* ═══ SHIFTS CALENDAR ═══ */
 .calendar-cell {
     background: var(--surface);

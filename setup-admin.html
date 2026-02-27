@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEO I-Service - Setup Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        body { background: #f0f4f8; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .container { background: white; padding: 40px; border-radius: 16px; max-width: 520px; width: 100%; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+        h2 { text-align: center; margin-bottom: 8px; color: #1e293b; }
+        .subtitle { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 24px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #334155; }
+        input { width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
+        input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+        .log { margin-top: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; max-height: 300px; overflow-y: auto; font-size: 13px; font-family: monospace; line-height: 1.6; }
+        .log .ok { color: #16a34a; }
+        .log .err { color: #dc2626; }
+        .log .info { color: #2563eb; }
+        .log .warn { color: #d97706; }
+        .divider { border-top: 1px solid #e2e8f0; margin: 20px 0; }
+        .creds { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-top: 16px; display: none; }
+        .creds h4 { color: #15803d; margin-bottom: 8px; }
+        .creds p { font-size: 14px; margin-bottom: 4px; }
+        .creds strong { color: #1e293b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🔧 NEO I-Service Setup</h2>
+        <p class="subtitle">สร้าง Admin User สำหรับเข้าระบบครั้งแรก</p>
+
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="username" value="admin" />
+        </div>
+        <div class="form-group">
+            <label>ชื่อ-นามสกุล</label>
+            <input type="text" id="fullname" value="Admin Neo" />
+        </div>
+        <div class="form-group">
+            <label>รหัสพนักงาน (Employee ID)</label>
+            <input type="text" id="empid" value="EMP001" />
+        </div>
+        <div class="form-group">
+            <label>รหัสผ่าน</label>
+            <input type="text" id="password" value="EMP001@Neo2026" />
+        </div>
+
+        <button class="btn btn-primary" id="btn-create" onclick="createAdmin()">
+            🚀 สร้าง Admin User
+        </button>
+
+        <div id="creds-box" class="creds">
+            <h4>✅ สร้างสำเร็จ! ข้อมูล Login:</h4>
+            <p>Username: <strong id="cred-user">-</strong></p>
+            <p>Password: <strong id="cred-pass">-</strong></p>
+            <p style="margin-top:12px;">
+                <a href="https://neo-i-service.vercel.app" target="_blank" style="color:#2563eb; font-weight:600;">
+                    ➡️ ไปหน้า Login เลย
+                </a>
+            </p>
+        </div>
+
+        <div class="log" id="log"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://jkrcjfjfncyvymdwcedi.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprcmNqZmpmbmN5dnltZHdjZWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NTMwMDksImV4cCI6MjA4NzMyOTAwOX0.awHuGfZ7Wr_OlMvGTBgS4vvbyB1BBR-06rEYMxsNGLk';
+        const EMAIL_DOMAIN = 'neo-iservice.app';
+
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        function log(msg, type = 'info') {
+            const el = document.getElementById('log');
+            el.innerHTML += `<div class="${type}">${new Date().toLocaleTimeString()} | ${msg}</div>`;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        async function createAdmin() {
+            const btn = document.getElementById('btn-create');
+            btn.disabled = true;
+            btn.textContent = '⏳ กำลังสร้าง...';
+
+            const username = document.getElementById('username').value.trim();
+            const fullname = document.getElementById('fullname').value.trim();
+            const empid = document.getElementById('empid').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const email = username.toLowerCase() + '@' + EMAIL_DOMAIN;
+
+            if (!username || !fullname || !empid || !password) {
+                log('❌ กรุณากรอกข้อมูลให้ครบ', 'err');
+                btn.disabled = false;
+                btn.textContent = '🚀 สร้าง Admin User';
+                return;
+            }
+
+            log(`📧 สร้าง Auth User: ${email}`, 'info');
+
+            try {
+                // Step 1: Sign Up
+                const { data: authData, error: authError } = await sb.auth.signUp({
+                    email: email,
+                    password: password
+                });
+
+                if (authError) {
+                    log(`❌ Auth Error: ${authError.message}`, 'err');
+                    if (authError.message.includes('rate_limit')) {
+                        log('⚠️ Supabase มี Rate Limit — รอ 60 วินาทีแล้วลองใหม่', 'warn');
+                    }
+                    if (authError.message.includes('already registered')) {
+                        log('⚠️ Email นี้ถูกลงทะเบียนแล้ว — ลอง Sign In แทน...', 'warn');
+                        await trySignInAndCreateProfile(email, password, empid, fullname, username);
+                    }
+                    btn.disabled = false;
+                    btn.textContent = '🚀 ลองอีกครั้ง';
+                    return;
+                }
+
+                if (!authData?.user) {
+                    log('❌ ไม่สามารถสร้าง Auth User ได้ (ไม่มี user data)', 'err');
+                    btn.disabled = false;
+                    btn.textContent = '🚀 ลองอีกครั้ง';
+                    return;
+                }
+
+                const userId = authData.user.id;
+                log(`✅ Auth User สร้างสำเร็จ! UUID: ${userId}`, 'ok');
+
+                // Step 2: Create Profile
+                await createProfile(userId, empid, fullname, email, username);
+
+            } catch (e) {
+                log(`❌ Exception: ${e.message}`, 'err');
+                btn.disabled = false;
+                btn.textContent = '🚀 ลองอีกครั้ง';
+            }
+        }
+
+        async function trySignInAndCreateProfile(email, password, empid, fullname, username) {
+            log('🔑 ลอง Sign In ด้วย email/password ที่มีอยู่...', 'info');
+            const { data, error } = await sb.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                log(`❌ Sign In ล้มเหลว: ${error.message}`, 'err');
+                return;
+            }
+
+            if (data?.user) {
+                log(`✅ Sign In สำเร็จ! UUID: ${data.user.id}`, 'ok');
+                await createProfile(data.user.id, empid, fullname, email, username);
+            }
+        }
+
+        async function createProfile(userId, empid, fullname, email, username) {
+            log('📝 กำลังสร้าง Profile ในตาราง profiles...', 'info');
+
+            const allMenus = [
+                "dashboard","checkin","records","map","worklog","shifts","manage-shifts",
+                "my-requests","approve-requests","approve-leave",
+                "report-general","report-leave","audit-log",
+                "users","workplaces","settings","profile"
+            ];
+
+            const { error: profileError } = await sb.from('profiles').upsert([{
+                id: userId,
+                employee_id: empid,
+                full_name: fullname,
+                email: email,
+                username: username,
+                role: 'HR Admin',
+                department: 'IT',
+                primary_shift: '09:00-18:00',
+                status: 'ใช้งาน',
+                accessible_menus: allMenus
+            }]);
+
+            if (profileError) {
+                log(`❌ Profile Error: ${profileError.message}`, 'err');
+                log('💡 ลองไปสร้าง Profile ที่ Supabase Dashboard > Table Editor > profiles', 'warn');
+            } else {
+                log('✅ Profile สร้างสำเร็จ! พร้อมใช้งาน', 'ok');
+                log(`🎉 Login ด้วย Username: ${username} / Password: ${document.getElementById('password').value}`, 'ok');
+
+                // Show credentials box
+                document.getElementById('cred-user').textContent = username;
+                document.getElementById('cred-pass').textContent = document.getElementById('password').value;
+                document.getElementById('creds-box').style.display = 'block';
+            }
+
+            const btn = document.getElementById('btn-create');
+            btn.disabled = false;
+            btn.textContent = '🚀 สร้าง Admin User';
+        }
+    </script>
+</body>
+</html>
