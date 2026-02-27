@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เข้าสู่ระบบ - Time Attendance</title>
+    <title>เข้าสู่ระบบ - NEO I-Service</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -157,7 +157,7 @@
         }
     </style>
 
-    <!-- Supabase -->
+    <!-- Supabase CDN (load once) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -166,20 +166,20 @@
     <div class="login-container">
         <div class="login-header">
             <div class="login-logo">
-                <i class="fa-solid fa-mountain-sun"></i>
+                <i class="fa-solid fa-shield-halved"></i>
             </div>
-            <h2>เข้าสู่ระบบส่วนกลาง</h2>
-            <p>Time Attendance System</p>
+            <h2>NEO I-Service</h2>
+            <p>ระบบจัดการเวลาเข้างาน</p>
         </div>
 
         <div id="error-box" class="error-msg"></div>
 
         <form id="login-form">
             <div class="form-group">
-                <label>อีเมล (Email)</label>
+                <label>ชื่อผู้ใช้ (Username)</label>
                 <div class="input-wrapper">
-                    <i class="fa-regular fa-envelope"></i>
-                    <input type="email" id="email" class="form-control" placeholder="admin@company.com" required>
+                    <i class="fa-regular fa-user"></i>
+                    <input type="text" id="username" class="form-control" placeholder="เช่น admin" required autocomplete="username">
                 </div>
             </div>
 
@@ -187,7 +187,7 @@
                 <label>รหัสผ่าน (Password)</label>
                 <div class="input-wrapper">
                     <i class="fa-solid fa-lock"></i>
-                    <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+                    <input type="password" id="password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
                 </div>
             </div>
 
@@ -207,17 +207,32 @@
         </div>
     </div>
 
-    <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="script.js"></script>
     <script>
+        // ─── Supabase Client Initialization (self-contained for login page) ───
+        const SUPABASE_URL = 'https://jkrcjfjfncyvymdwcedi.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprcmNqZmpmbmN5dnltZHdjZWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NTMwMDksImV4cCI6MjA4NzMyOTAwOX0.awHuGfZ7Wr_OlMvGTBgS4vvbyB1BBR-06rEYMxsNGLk';
+        const USERNAME_EMAIL_DOMAIN = 'neo-iservice.app';
+
+        // Create Supabase client directly from CDN factory (no script.js dependency)
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        function usernameToEmail(username) {
+            return username.toLowerCase().trim() + '@' + USERNAME_EMAIL_DOMAIN;
+        }
+
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const email = document.getElementById('email').value;
+            const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
             const btn = document.getElementById('btn-submit');
             const errorBox = document.getElementById('error-box');
+
+            if (!username) {
+                errorBox.textContent = 'กรุณากรอกชื่อผู้ใช้';
+                errorBox.style.display = 'block';
+                return;
+            }
 
             // Reset state
             errorBox.style.display = 'none';
@@ -225,20 +240,28 @@
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังตรวจสอบ...';
 
             try {
-                const { data, error } = await supabase.auth.signInWithPassword({
-                    email: email,
+                // Convert username to synthetic email for Supabase auth
+                const syntheticEmail = usernameToEmail(username);
+                console.log('Attempting login with:', syntheticEmail);
+
+                const { data, error } = await supabaseClient.auth.signInWithPassword({
+                    email: syntheticEmail,
                     password: password,
                 });
 
                 if (error) throw error;
 
+                console.log('Login successful!', data);
                 // Login success, redirect to main app
                 window.location.href = 'index.html';
 
             } catch (error) {
+                console.error('Login error:', error);
                 let errorMsg = 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ';
-                if (error.message.includes('Invalid login credentials')) {
-                    errorMsg = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+                if (error.message && error.message.includes('Invalid login credentials')) {
+                    errorMsg = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+                } else if (error.message) {
+                    errorMsg = error.message;
                 }
 
                 errorBox.textContent = errorMsg;
@@ -250,9 +273,13 @@
 
         // ตรวจสอบว่ามี session Login ค้างอยู่หรือไม่ ถ้ามีให้พาไปหน้า Dashboard เลย
         window.addEventListener('DOMContentLoaded', async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                window.location.href = 'index.html';
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session) {
+                    window.location.href = 'index.html';
+                }
+            } catch (e) {
+                console.warn('Session check failed:', e);
             }
         });
     </script>
