@@ -7,6 +7,8 @@ const APP_STATE = {
 // ─── Superbase Initialization ──────────────────────────────
 const SUPABASE_URL = 'https://jkrcjfjfncyvymdwcedi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprcmNqZmpmbmN5dnltZHdjZWRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE3NTMwMDksImV4cCI6MjA4NzMyOTAwOX0.awHuGfZ7Wr_OlMvGTBgS4vvbyB1BBR-06rEYMxsNGLk';
+const USERNAME_EMAIL_DOMAIN = 'neo-iservice.app'; // Used to construct synthetic emails from usernames
+function usernameToEmail(username) { return username.toLowerCase().trim() + '@' + USERNAME_EMAIL_DOMAIN; }
 var supabase;
 try {
     if (window.supabase) {
@@ -85,7 +87,7 @@ async function loadCurrentUserProfile(uid) {
             .from('profiles')
             .select('*')
             .eq('id', uid)
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
 
@@ -93,7 +95,9 @@ async function loadCurrentUserProfile(uid) {
             MOCK_USER.id = data.employee_id || '';
             MOCK_USER.name = data.full_name || '';
             MOCK_USER.role = data.role || 'พนักงาน';
-            MOCK_USER.permissions = data.accessible_menus || ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
+            
+            // กำหนด permissions ตาม role (เพราะตาราง profiles ไม่มี accessible_menus column)
+            MOCK_USER.permissions = getPermissionsByRole(data.role);
 
             applyUserPermissions();
 
@@ -103,16 +107,42 @@ async function loadCurrentUserProfile(uid) {
             if (roleEl) roleEl.textContent = data.role;
         } else {
             // Profile not found but user is authenticated
-            MOCK_USER.permissions = ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
+            MOCK_USER.permissions = getPermissionsByRole('พนักงาน');
             applyUserPermissions();
         }
     } catch (e) {
         console.error("Error loading user profile:", e);
         // Still keep uuid from auth so check-in works
-        MOCK_USER.permissions = ['dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'my-requests', 'profile'];
+        MOCK_USER.permissions = getPermissionsByRole('พนักงาน');
         applyUserPermissions();
     }
 }
+
+// กำหนดสิทธิ์ตาม Role
+function getPermissionsByRole(role) {
+    const allMenus = [
+        'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'manage-shifts',
+        'my-requests', 'approve-requests', 'approve-leave',
+        'report-general', 'report-leave', 'audit-log',
+        'users', 'workplaces', 'settings', 'profile'
+    ];
+    
+    const supervisorMenus = [
+        'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'manage-shifts',
+        'my-requests', 'approve-requests', 'approve-leave',
+        'report-general', 'report-leave', 'profile'
+    ];
+    
+    const employeeMenus = [
+        'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts',
+        'my-requests', 'profile'
+    ];
+    
+    if (role === 'HR Admin') return allMenus;
+    if (role === 'หัวหน้างาน') return supervisorMenus;
+    return employeeMenus;
+}
+
 
 function applyUserPermissions() {
     const perms = MOCK_USER.permissions || [];
@@ -489,6 +519,41 @@ function updateCheckinStatusCard(type, category) {
 // ─── MODALS & UTILS ──────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// ─── CONFIRM ACTION DIALOG ───────────────────────────
+let _confirmActionCallback = null;
+
+function confirmAction(title, subtitle, callback) {
+    _confirmActionCallback = callback;
+    const modal = document.getElementById('confirm-action-modal');
+    if (!modal) {
+        // Fallback to native confirm if modal doesn't exist
+        if (confirm(title + (subtitle ? '\n' + subtitle : ''))) {
+            callback();
+        }
+        return;
+    }
+    document.getElementById('confirm-action-title').textContent = title || 'ยืนยันการดำเนินการ?';
+    document.getElementById('confirm-action-subtitle').textContent = subtitle || '';
+    document.getElementById('confirm-action-subtitle').style.display = subtitle ? 'block' : 'none';
+    openModal('confirm-action-modal');
+}
+
+function executeConfirmAction() {
+    closeModal('confirm-action-modal');
+    if (_confirmActionCallback && typeof _confirmActionCallback === 'function') {
+        // Small delay to allow modal close animation
+        setTimeout(() => {
+            _confirmActionCallback();
+            _confirmActionCallback = null;
+        }, 200);
+    }
+}
+
+function cancelConfirmAction() {
+    closeModal('confirm-action-modal');
+    _confirmActionCallback = null;
+}
 
 // ─── DASHBOARD (B4) ──────────────────────────────────
 function loadDashboard() {
@@ -931,12 +996,18 @@ async function saveUser() {
     }
     
     const fullName = fname + ' ' + lname;
+    const username = document.getElementById('u-username').value.trim();
+    
+    if (!username) {
+        alert('กรุณากรอกชื่อผู้ใช้ (Username) สำหรับใช้เข้าสู่ระบบ');
+        return;
+    }
     
     const payload = {
         employee_id: document.getElementById('u-empid').value.trim(),
         full_name: fullName,
-        email: document.getElementById('u-email').value.trim(),
-        username: document.getElementById('u-username').value.trim(),
+        email: document.getElementById('u-email').value.trim(), // Real email for password reset
+        username: username,
         role: document.getElementById('u-role').value,
         department: document.getElementById('u-department') ? document.getElementById('u-department').value : null,
         primary_shift: document.getElementById('u-shift').value.trim(),
@@ -968,32 +1039,32 @@ async function saveUser() {
             if (error) throw error;
             alert('แก้ไขข้อมูลสำเร็จ!');
         } else {
-            // For new employees: try to create auth user first, then insert profile
+            // For new employees: create auth user with synthetic email from username
             let insertSuccess = false;
             
-            if (payload.email) {
-                // Create auth user with email + default password
-                const defaultPassword = payload.employee_id + '@Neo2026';
-                const { data: authData, error: authError } = await supabase.auth.signUp({
-                    email: payload.email,
-                    password: defaultPassword
-                });
+            // Construct synthetic email from username for Supabase Auth
+            const syntheticEmail = usernameToEmail(username);
+            const defaultPassword = payload.employee_id + '@Neo2026';
+            
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: syntheticEmail,
+                password: defaultPassword
+            });
+            
+            if (!authError && authData?.user) {
+                // Now insert profile with the auth user's id
+                const profilePayload = { ...payload, id: authData.user.id };
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .upsert([profilePayload]);
                 
-                if (!authError && authData?.user) {
-                    // Now insert profile with the auth user's id
-                    const profilePayload = { ...payload, id: authData.user.id };
-                    const { error: profileError } = await supabase
-                        .from('profiles')
-                        .upsert([profilePayload]);
-                    
-                    if (profileError) {
-                        console.warn('Profile insert error:', profileError.message);
-                    } else {
-                        insertSuccess = true;
-                    }
+                if (profileError) {
+                    console.warn('Profile insert error:', profileError.message);
                 } else {
-                    console.warn('Auth signUp failed:', authError?.message);
+                    insertSuccess = true;
                 }
+            } else {
+                console.warn('Auth signUp failed:', authError?.message);
             }
             
             if (!insertSuccess) {
@@ -1007,7 +1078,7 @@ async function saveUser() {
                 localStorage.setItem('localUsers', JSON.stringify(localUsers));
                 console.log('User saved to localStorage (fallback)');
             }
-            alert('บันทึกสำเร็จ!');
+            alert(`บันทึกสำเร็จ! Username: ${username} / รหัสผ่านเริ่มต้น: ${defaultPassword}`);
         }
         loadUsers();
     } catch (error) {
@@ -1422,14 +1493,16 @@ function renderCalendar() {
 
         if (shift) {
             let badgeClass = 'shift-off';
-            if (shift.type === 'morning') badgeClass = 'shift-morning';
-            else if (shift.type === 'afternoon') badgeClass = 'shift-afternoon';
-            else if (shift.type === 'night') badgeClass = 'shift-night';
+            let badgeColor = '';
+            if (shift.type === 'morning') { badgeClass = 'shift-morning'; badgeColor = 'background:#dcfce7;color:#15803d;'; }
+            else if (shift.type === 'afternoon') { badgeClass = 'shift-afternoon'; badgeColor = 'background:#fef3c7;color:#b45309;'; }
+            else if (shift.type === 'night') { badgeClass = 'shift-night'; badgeColor = 'background:#dbeafe;color:#1d4ed8;'; }
+            else if (shift.type === 'overnight') { badgeClass = 'shift-overnight'; badgeColor = 'background:#ede9fe;color:#6d28d9;'; }
             
             // Show employee name if available
             const empName = shift.empName || '';
             const nameHtml = empName ? `<div style="font-size:9px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${empName}</div>` : '';
-            badgeHtml = `<div class="shift-badge ${badgeClass}">${shift.label}</div>${nameHtml}`;
+            badgeHtml = `<div class="shift-badge ${badgeClass}" style="${badgeColor}font-size:10px;padding:2px 4px;border-radius:4px;text-align:center;">${shift.label}</div>${nameHtml}`;
         }
 
         const cell = document.createElement('div');
@@ -1509,12 +1582,13 @@ function renderManageShiftsTable() {
              bodyHtml += `<tr><td style="position: sticky; left: 0; background: #fff; z-index: 1;"><strong>${empRow.empName}</strong></td>`;
              for(let d=1; d<=daysInMon; d++) {
                  let shiftVal = empRow.shifts[d-1] || 'O';
-                 let color = shiftVal==='O'?'var(--text-muted)': (shiftVal==='N'?'var(--primary)': (shiftVal==='M'?'var(--success)': 'var(--warning)'));
+                 let color = shiftVal==='O'?'var(--text-muted)': (shiftVal==='D'?'#6d28d9': (shiftVal==='N'?'var(--primary)': (shiftVal==='M'?'var(--success)': 'var(--warning)')));
                  bodyHtml += `<td style="text-align:center; padding: 0;">
                     <select class="form-control" style="width:100%; height:100%; border:none; padding: 8px 4px; background: transparent; font-weight:bold; color:${color}; cursor:pointer; text-align:center; appearance: none;" onchange="updateManualShift(${empIdx}, ${d-1}, this.value)">
                       <option value="M" ${shiftVal==='M'?'selected':''} style="color:var(--success)">M</option>
                       <option value="A" ${shiftVal==='A'?'selected':''} style="color:var(--warning)">A</option>
                       <option value="N" ${shiftVal==='N'?'selected':''} style="color:var(--primary)">N</option>
+                      <option value="D" ${shiftVal==='D'?'selected':''} style="color:#6d28d9">D</option>
                       <option value="O" ${shiftVal==='O'?'selected':''} style="color:var(--text-muted)">O</option>
                     </select>
                  </td>`;
@@ -1527,7 +1601,7 @@ function renderManageShiftsTable() {
     container.innerHTML = `
         <div style="padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div style="display:flex; gap:8px;">
-                <span style="font-size:13px;" class="text-muted"><strong class="text-success">M</strong>=เช้า, <strong class="text-warning">A</strong>=บ่าย, <strong class="text-primary">N</strong>=ดึก, <strong>O</strong>=หยุด</span>
+                <span style="font-size:13px;" class="text-muted"><strong class="text-success">M</strong>=เช้า, <strong class="text-warning">A</strong>=บ่าย, <strong class="text-primary">N</strong>=ค่ำ, <strong style="color:#6d28d9">D</strong>=ดึก, <strong>O</strong>=หยุด</span>
             </div>
             ${manualShiftData.length > 0 ? `
             <div style="display:flex; gap:8px;">
@@ -1700,9 +1774,10 @@ function generateAIShifts() {
             for(let d=1; d<=daysInMon; d++) {
                 const r = Math.random();
                 let txt = 'O'; 
-                if(r > 0.8) txt = 'N'; 
-                else if(r > 0.6) txt = 'M'; 
-                else if(r > 0.2) txt = 'A'; 
+                if(r > 0.85) txt = 'D';       // ดึก (22:00-06:00)
+                else if(r > 0.7) txt = 'N';   // ค่ำ (16:00-00:00)
+                else if(r > 0.5) txt = 'M';   // เช้า (08:00-16:00)
+                else if(r > 0.15) txt = 'A';  // บ่าย (12:00-20:00)
                 shifts.push(txt);
             }
             return { empName: emp, shifts: shifts };
