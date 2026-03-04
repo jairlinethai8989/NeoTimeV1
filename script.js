@@ -554,6 +554,24 @@ async function submitCheckin(type) {
             status = 'ไม่พบสถานที่';
         }
 
+        // --- เพิ่มการตรวจสอบสถานะ "สาย" (Late) ---
+        if (type === 'Check-in' && status === 'ปกติ') {
+            const config = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+            const timeInStr = config.timeIn || '08:30';
+            const graceMinutes = parseInt(config.lateGrace || '0');
+
+            if (timeInStr) {
+                const now = new Date();
+                const [targetH, targetM] = timeInStr.split(':').map(Number);
+                const deadline = new Date(now);
+                deadline.setHours(targetH, targetM + graceMinutes, 0, 0);
+
+                if (now > deadline) {
+                    status = 'สาย';
+                }
+            }
+        }
+
         let finalNote = note;
         if (checkinCategory !== 'เวลาปกติ') {
             finalNote = `[${checkinCategory}] ${note}`.trim();
@@ -581,7 +599,11 @@ async function submitCheckin(type) {
         setTimeout(() => {
             btn.disabled = false;
             btn.innerHTML = originalHtml;
-            alert(`ทำรายการ ${type} (${checkinCategory}) สำเร็จ!\nสถานที่: ${closestWp ? closestWp.name : 'ทั่วไป'}\nสถานะ: ${status}`);
+            
+            // ใช้ Toast แทน Alert ปกติ
+            const msg = `สถานที่: ${closestWp ? closestWp.name : 'ทั่วไป'}\nสถานะ: ${status}`;
+            showToast(`บันทึก ${type} สำเร็จ`, msg, status === 'ปกติ' ? 'success' : 'warning');
+            
             updateCheckinStatusCard(type, checkinCategory);
         }, 800);
 
@@ -2962,14 +2984,14 @@ async function saveProfileData() {
             document.getElementById('profile-img-preview').src = `https://ui-avatars.com/api/?name=${encodedName}&background=2563eb&color=fff`;
         }
         
-        alert("อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว");
+        showToast("สำเร็จ", "อัปเดตข้อมูลโปรไฟล์เรียบร้อยแล้ว", "success");
         
         // Refresh display texts
         document.getElementById('profile-display-name').textContent = payload.full_name;
         
     } catch (err) {
         console.error("Error saving profile details:", err.message);
-        alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + err.message);
+        showToast("ผิดพลาด", "เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + err.message, "danger");
     } finally {
         btn.innerHTML = orgHtml;
         btn.disabled = false;
@@ -3706,7 +3728,7 @@ function clearProfileSignature() {
     if (preImg) preImg.style.display = 'none';
     if (noSigTxt) noSigTxt.style.display = 'block';
     
-    alert('ล้างลายเซ็นชั่วคราวแล้ว อย่าลืมกด "บันทึกข้อมูล" เพื่อยืนยันการเปลี่ยนแปลง');
+    showToast('ล้างลายเซ็นเรียบร้อย', 'อย่าลืมกด "บันทึกข้อมูล" เพื่อยืนยันการเปลี่ยนแปลง', 'warning');
 }
 
 window.clearProfileSignature = clearProfileSignature;
@@ -3732,7 +3754,7 @@ async function saveWorklogDraft() {
                 entries: worklogEntries
             }));
             
-            alert('บันทึกข้อมูลการทำงานลงฐานข้อมูลเรียบร้อยแล้ว');
+            showToast('บันทึกสำเร็จ', 'บันทึกข้อมูลการทำงานลงฐานข้อมูลเรียบร้อยแล้ว', 'success');
             loadWorklogPage();
         } catch(e) {
             console.error('[Worklog] Save failed:', e);
@@ -3808,3 +3830,40 @@ async function logActivity(action, detail = '') {
     }
 }
 
+
+// ฟังก์ชันแสดงการแจ้งเตือนแบบ Toast (iOS Glassmorphism Style)
+function showToast(title, message, type = 'info', duration = 4000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    let icon = 'fa-info-circle';
+    if (type === 'success') icon = 'fa-circle-check';
+    if (type === 'warning') icon = 'fa-triangle-exclamation';
+    if (type === 'danger') icon = 'fa-circle-xmark';
+
+    toast.innerHTML = `
+        <div class="toast-icon"><i class="fa-solid ${icon}"></i></div>
+        <div class="toast-content">
+            <span class="toast-title">${title}</span>
+            <span class="toast-message">${message}</span>
+        </div>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto remove
+    const timer = setTimeout(() => {
+        toast.classList.add('fadeOut');
+        setTimeout(() => toast.remove(), 500);
+    }, duration);
+
+    // Manual remove on click
+    toast.onclick = () => {
+        clearTimeout(timer);
+        toast.classList.add('fadeOut');
+        setTimeout(() => toast.remove(), 500);
+    };
+}
