@@ -96,11 +96,15 @@ async function loadCurrentUserProfile(uid) {
             MOCK_USER.name = data.full_name || '';
             MOCK_USER.role = data.role || 'พนักงาน';
             
-            // ใช้สิทธิ์การเข้าถึงจากฐานข้อมูล (ที่ Admin ตั้งค่าไว้) หากไม่มีจึงใช้ค่าเริ่มต้นตาม Role
-            if (data.accessible_menus && Array.isArray(data.accessible_menus) && data.accessible_menus.length > 0) {
+            // ใช้สิทธิ์การเข้าถึงจากฐานข้อมูล (ที่ Admin ตั้งค่าไว้)
+            // สำหรับ Admin ให้พยายามให้เห็นครบทุกเมนูไว้ก่อน เว้นแต่มีการระบุเจาะจงที่ขนาดใหญ่กว่าค่าเริ่มต้น
+            const rolePerms = getPermissionsByRole(data.role);
+            if (checkIsAdmin(data.role)) {
+                MOCK_USER.permissions = rolePerms;
+            } else if (data.accessible_menus && Array.isArray(data.accessible_menus) && data.accessible_menus.length > 0) {
                 MOCK_USER.permissions = data.accessible_menus;
             } else {
-                MOCK_USER.permissions = getPermissionsByRole(data.role);
+                MOCK_USER.permissions = rolePerms;
             }
             
             // Sync with UI
@@ -131,6 +135,12 @@ async function loadCurrentUserProfile(uid) {
     }
 }
 
+// ฟังก์ชันตรวจสอบว่าเป็น Admin หรือไม่ (รองรับหลายภาษา/รูปแบบ)
+function checkIsAdmin(role) {
+    const r = (role || '').toLowerCase().trim();
+    return r === 'hr admin' || r === 'admin' || r.includes('admin') || r === 'hr administrator' || r === 'ผู้ดูแลระบบ';
+}
+
 // กำหนดสิทธิ์ตาม Role (ค่าเริ่มต้นกรณีไม่ได้ทำ Custom Permissions)
 function getPermissionsByRole(role) {
     const allMenus = [
@@ -151,14 +161,11 @@ function getPermissionsByRole(role) {
         'my-requests', 'profile'
     ];
     
-    // Normalize role name
-    const r = (role || '').toLowerCase().trim();
+    if (checkIsAdmin(role)) return allMenus;
     
-    // ตรวจสอบทั้งภาษาอังกฤษและภาษาไทย
-    const isAdmin = r === 'hr admin' || r === 'admin' || r.includes('admin') || r === 'hr administrator' || r === 'ผู้ดูแลระบบ';
+    const r = (role || '').toLowerCase().trim();
     const isSupervisor = r === 'หัวหน้างาน' || r.includes('หัวหน้า') || r === 'supervisor' || r === 'หัวหน้า';
-
-    if (isAdmin) return allMenus;
+    
     if (isSupervisor) return supervisorMenus;
     return employeeMenus;
 }
@@ -184,7 +191,7 @@ function applyUserPermissions() {
         
         // พิเศษ: สำหรับ Admin ให้แสดงกลุ่มจัดการระบบเสมอถ้ามีสิทธิ์
         const isManageGroup = group.querySelector('.nav-item-content')?.textContent.includes('จัดการระบบ');
-        const isAdmin = (MOCK_USER.role || '').toLowerCase().includes('admin');
+        const isAdmin = checkIsAdmin(MOCK_USER.role);
 
         if (hasVisibleChild || (isManageGroup && isAdmin)) {
             group.style.display = 'block';
