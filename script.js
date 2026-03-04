@@ -181,7 +181,12 @@ function applyUserPermissions() {
     document.querySelectorAll('.sidebar-nav .nav-group').forEach(group => {
         const children = Array.from(group.querySelectorAll('.nav-child[data-page]'));
         const hasVisibleChild = children.some(c => c.style.display !== 'none');
-        if (hasVisibleChild) {
+        
+        // พิเศษ: สำหรับ Admin ให้แสดงกลุ่มจัดการระบบเสมอถ้ามีสิทธิ์
+        const isManageGroup = group.querySelector('.nav-item-content')?.textContent.includes('จัดการระบบ');
+        const isAdmin = (MOCK_USER.role || '').toLowerCase().includes('admin');
+
+        if (hasVisibleChild || (isManageGroup && isAdmin)) {
             group.style.display = 'block';
         } else {
             group.style.display = 'none';
@@ -1564,7 +1569,20 @@ async function loadShifts() {
             data.forEach(row => {
                 const ds = new Date(row.date);
                 const dateKey = ds.toDateString();
-                myShiftsMap[dateKey] = row.shift_code;
+                
+                // Map shift code to object for renderCalendar
+                let type = 'off';
+                let label = row.shift_code || 'O';
+                if (label === 'D') type = 'morning';
+                else if (label === 'N') type = 'night';
+                else if (label === 'Sat' || label === 'Sun') type = 'afternoon';
+                else if (label === 'M') type = 'morning';
+                else if (label === 'A') type = 'afternoon';
+
+                myShiftsMap[dateKey] = {
+                    type: type,
+                    label: label
+                };
             });
         }
     } catch(e) {
@@ -3641,6 +3659,7 @@ function renderWorklog() {
     
     worklogEntries.forEach(entry => {
         const tr = document.createElement('tr');
+        tr.setAttribute('data-id', entry.id);
         
         let dateHtml = '';
         if(wlViewMode !== 'daily') {
@@ -3669,6 +3688,21 @@ function renderWorklog() {
         tbody.appendChild(tr);
     });
 }
+
+function clearProfileSignature() {
+    if (!confirm('คุณต้องการรีเซ็ตหรือลบลายเซ็นปัจจุบันใช่หรือไม่?')) return;
+    
+    document.getElementById('prof-signature_base64').value = '';
+    const preImg = document.getElementById('saved-signature-preview');
+    const noSigTxt = document.getElementById('no-signature-text');
+    
+    if (preImg) preImg.style.display = 'none';
+    if (noSigTxt) noSigTxt.style.display = 'block';
+    
+    alert('ล้างลายเซ็นชั่วคราวแล้ว อย่าลืมกด "บันทึกข้อมูล" เพื่อยืนยันการเปลี่ยนแปลง');
+}
+
+window.clearProfileSignature = clearProfileSignature;
 
 async function saveWorklogDraft() {
     confirmAction('ยืนยันการบันทึกรายการทำงานทั้งหมด?', 'ข้อมูลจะถูกบันทึกลงฐานข้อมูลส่วนกลาง', async () => {
