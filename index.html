@@ -124,16 +124,7 @@
         </div>
       </div>
 
-      <a class="nav-item" data-page="profile" onclick="navigateTo('profile', this)">
-        <div class="nav-item-content"><i class="fa-regular fa-user"></i> <span>โปรไฟล์</span></div>
-      </a>
     </nav>
-
-    <div class="sidebar-footer">
-      <a class="nav-item btn-logout" onclick="logout()">
-        <div class="nav-item-content"><i class="fa-solid fa-right-from-bracket"></i> <span>ออกจากระบบ</span></div>
-      </a>
-    </div>
   </aside>
 
   <!-- ═══ MAIN CONTENT ═══ -->
@@ -154,7 +145,7 @@
           <i class="fa-solid fa-arrows-rotate"></i>
         </button>
 
-        <div class="header-user">
+        <div class="header-user" onclick="toggleUserDropdown()">
           <div class="header-user-info hide-mobile">
             <h4 id="user-display-name">HR Administrator</h4>
             <p id="user-display-role">HR Admin</p>
@@ -162,6 +153,21 @@
           <div class="user-avatar">
             <img src="https://ui-avatars.com/api/?name=HR+Admin&background=2563eb&color=fff" alt="User"
               id="user-avatar-img">
+            <div class="dropdown-chevron"><i class="fa-solid fa-chevron-down"></i></div>
+          </div>
+
+          <!-- Header User Dropdown -->
+          <div class="header-user-dropdown" id="user-dropdown-menu">
+            <div class="dropdown-header">
+                <strong>บัญชีของฉัน</strong>
+            </div>
+            <a class="dropdown-item" data-page="profile" onclick="navigateTo('profile', this)">
+                <i class="fa-regular fa-user"></i> โปรไฟล์ของฉัน
+            </a>
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item btn-logout text-danger" onclick="logout()">
+                <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ
+            </a>
           </div>
         </div>
       </div>
@@ -174,67 +180,68 @@
       <div class="page-content active" id="page-dashboard">
         <!-- Stat Cards -->
         <div class="stat-grid">
-          <div class="stat-card">
+          <div class="stat-card" onclick="navigateTo('users', document.querySelector('[data-page=users]'), true)">
             <div class="stat-icon bg-primary-light text-primary"><i class="fa-solid fa-users"></i></div>
             <div class="stat-info">
               <h3>พนักงานทั้งหมด</h3>
               <div class="stat-val" id="dash-total">0</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" onclick="navigateTo('records', document.querySelector('[data-page=records]'))">
             <div class="stat-icon bg-success-light text-success"><i class="fa-solid fa-user-check"></i></div>
             <div class="stat-info">
               <h3>มาทำงานวันนี้</h3>
               <div class="stat-val" id="dash-present">0</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" onclick="navigateTo('records', document.querySelector('[data-page=records]'))">
             <div class="stat-icon bg-warning-light text-warning"><i class="fa-solid fa-clock"></i></div>
             <div class="stat-info">
               <h3>มาสาย</h3>
               <div class="stat-val" id="dash-late">0</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" onclick="navigateTo('records', document.querySelector('[data-page=records]'))">
             <div class="stat-icon bg-danger-light text-danger"><i class="fa-solid fa-user-xmark"></i></div>
             <div class="stat-info">
               <h3>ขาดงาน</h3>
               <div class="stat-val" id="dash-absent">0</div>
             </div>
           </div>
+
         </div>
 
         <!-- Secondary Stat Grid: Leaves -->
         <div class="stat-grid" style="margin-top: 16px;">
-          <div class="stat-card">
+          <div class="stat-card" onclick="navigateTo('report-leave', document.querySelector('[data-page=report-leave]'), true)">
             <div class="stat-icon bg-info-light text-info"><i class="fa-solid fa-file-contract"></i></div>
             <div class="stat-info">
               <h3>ลางานรวม</h3>
               <div class="stat-val" id="dash-leave-total">0</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" onclick="navigateTo('report-leave', document.querySelector('[data-page=report-leave]'), true)">
             <div class="stat-icon bg-warning-light text-warning"><i class="fa-solid fa-briefcase"></i></div>
             <div class="stat-info">
               <h3>ลากิจ</h3>
               <div class="stat-val" id="dash-leave-personal">0</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" onclick="navigateTo('report-leave', document.querySelector('[data-page=report-leave]'), true)">
             <div class="stat-icon bg-danger-light text-danger"><i class="fa-solid fa-bed"></i></div>
             <div class="stat-info">
               <h3>ลาป่วย</h3>
               <div class="stat-val" id="dash-leave-sick">0</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" onclick="navigateTo('report-leave', document.querySelector('[data-page=report-leave]'), true)">
             <div class="stat-icon bg-primary-light text-primary"><i class="fa-solid fa-umbrella-beach"></i></div>
             <div class="stat-info">
               <h3>ลาพักร้อน</h3>
               <div class="stat-val" id="dash-leave-vacation">0</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" onclick="navigateTo('map', document.querySelector('[data-page=map]'))">
             <div class="stat-icon bg-success-light text-success"><i class="fa-solid fa-truck-fast"></i></div>
             <div class="stat-info">
               <h3>ทำงานนอกพื้นที่</h3>
@@ -242,6 +249,7 @@
             </div>
           </div>
         </div>
+
 
         <!-- Dashboard: Leave Calendar (Full Width) -->
         <div class="dashboard-card" style="margin-bottom: 24px;">
@@ -265,6 +273,22 @@
                 <div><span style="display:inline-block;width:10px;height:10px;border-radius:4px;background:#FF9500;vertical-align:middle;margin-right:6px;"></span>ลากิจ</div>
                 <div><span style="display:inline-block;width:10px;height:10px;border-radius:4px;background:#007AFF;vertical-align:middle;margin-right:6px;"></span>ลาพักร้อน</div>
               </div>
+            </div>
+        </div>
+
+        <!-- Dashboard: Recent Activity -->
+        <div class="dashboard-card" style="margin-bottom: 24px;">
+            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+              <h3 class="card-title"><i class="fa-solid fa-clock-rotate-left"></i> รายการเช็คอินล่าสุด</h3>
+              <button class="btn btn-outline" style="padding: 4px 12px; font-size: 12px;" onclick="navigateTo('records', document.querySelector('[data-page=records]'))">ดูทั้งหมด</button>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div id="dash-recent-activity">
+                    <!-- Loaded via JS -->
+                    <div style="padding: 24px; text-align: center; color: var(--text-muted);">
+                        <i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลดกิจกรรมล่าสุด...
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -293,30 +317,41 @@
           </div>
 
           <!-- Status Card -->
-          <div class="checkin-status empty">
-            <div class="status-icon"><i class="fa-solid fa-location-dot"></i></div>
-            <h3>ระบบลงเวลาอิสระ</h3>
-            <p>คุณสามารถลงเวลาเข้า-ออกงานได้จากทุกที่</p>
+          <div class="checkin-status empty" style="padding: 20px;">
+            <div class="status-icon" style="width: 44px; height: 44px; font-size: 20px;"><i class="fa-solid fa-location-dot"></i></div>
+            <h4 style="font-size: 15px; font-weight: 700;">ระบบลงเวลาอิสระ</h4>
+            <p style="font-size: 11.5px; opacity: 0.8;">บันทึกเวลาเข้า-ออกงานได้จากทุกที่</p>
           </div>
 
-          <!-- Attendance Type -->
-          <div class="checkin-card" style="margin-bottom: 24px; padding: 16px; border: 2px solid var(--border);" id="ci-type-card">
-            <h4 style="margin-bottom: 12px; font-size: 14px; text-align: center;"><i class="fa-solid fa-clipboard-list text-primary"></i> เลือกประเภทการลงเวลา</h4>
-            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: bold; font-size: 15px;">
-                    <input type="radio" name="ci-type" value="เวลาปกติ" checked onchange="updateCheckinColors('normal')">
-                    <span style="color: var(--primary);">เวลาปกติ</span>
+          <!-- Attendance Type Seleciton (Segmented-like) -->
+          <div class="checkin-card" style="margin-bottom: 24px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.03);" id="ci-type-card">
+            <h4 style="margin-bottom: 16px; font-size: 13.5px; text-align: left; color: var(--text-muted); font-weight: 600;"><i class="fa-solid fa-clipboard-list text-primary"></i> ประเภทการลงเวลางาน</h4>
+            
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                <label style="cursor: pointer; position: relative;">
+                    <input type="radio" name="ci-type" value="เวลาปกติ" checked onchange="updateCheckinColors('normal')" style="position: absolute; opacity: 0;">
+                    <div class="ci-type-btn" id="ci-type-btn-normal">
+                       <i class="fa-solid fa-clock"></i>
+                       <span>ปกติ</span>
+                    </div>
                 </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: bold; font-size: 15px;">
-                    <input type="radio" name="ci-type" value="OT" onchange="updateCheckinColors('ot')">
-                    <span style="color: var(--warning);">OT</span>
+                <label style="cursor: pointer; position: relative;">
+                    <input type="radio" name="ci-type" value="OT" onchange="updateCheckinColors('ot')" style="position: absolute; opacity: 0;">
+                    <div class="ci-type-btn" id="ci-type-btn-ot">
+                       <i class="fa-solid fa-fire"></i>
+                       <span>OT</span>
+                    </div>
                 </label>
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: bold; font-size: 15px;">
-                    <input type="radio" name="ci-type" value="เข้ากะ" onchange="updateCheckinColors('shift')">
-                    <span style="color: var(--info);">เข้ากะ</span>
+                <label style="cursor: pointer; position: relative;">
+                    <input type="radio" name="ci-type" value="เข้ากะ" onchange="updateCheckinColors('shift')" style="position: absolute; opacity: 0;">
+                    <div class="ci-type-btn" id="ci-type-btn-shift">
+                       <i class="fa-solid fa-rotate"></i>
+                       <span>กะงาน</span>
+                    </div>
                 </label>
             </div>
           </div>
+
 
           <!-- Location Info -->
           <div class="checkin-card" style="margin-bottom: 24px;">
@@ -838,11 +873,7 @@
                   </td>
                 </tr>
               </tbody>
-            </table>
           </div>
-        </div>
-      </div>
-
         </div>
       </div>
 
@@ -908,6 +939,7 @@
                 <small class="text-muted">กำหนดจำนวนวันสูงสุดที่พนักงานสามารถลาติดต่อกันได้</small>
               </div>
             </div>
+          </div>
           
           <div class="card p-24">
             <h3 class="card-title"><i class="fa-solid fa-building-user"></i> ตั้งค่าองค์กร</h3>

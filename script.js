@@ -96,20 +96,33 @@ async function loadCurrentUserProfile(uid) {
             MOCK_USER.name = data.full_name || '';
             MOCK_USER.role = data.role || 'พนักงาน';
             
-            // กำหนด permissions ตาม role (เพราะตาราง profiles ไม่มี accessible_menus column)
-            MOCK_USER.permissions = getPermissionsByRole(data.role);
-
-            applyUserPermissions();
-
+            // ใช้สิทธิ์การเข้าถึงจากฐานข้อมูล (ที่ Admin ตั้งค่าไว้) หากไม่มีจึงใช้ค่าเริ่มต้นตาม Role
+            if (data.accessible_menus && Array.isArray(data.accessible_menus) && data.accessible_menus.length > 0) {
+                MOCK_USER.permissions = data.accessible_menus;
+            } else {
+                MOCK_USER.permissions = getPermissionsByRole(data.role);
+            }
+            
+            // Sync with UI
             const nameEl = document.getElementById('user-display-name');
             const roleEl = document.getElementById('user-display-role');
-            if (nameEl) nameEl.textContent = data.full_name;
-            if (roleEl) roleEl.textContent = data.role;
+            if (nameEl) nameEl.textContent = data.full_name || 'User';
+            if (roleEl) roleEl.textContent = data.role || 'พนักงาน';
+            
+            const avatarImg = document.getElementById('user-avatar-img');
+            if (avatarImg) {
+                const encodedName = encodeURIComponent(data.full_name || 'User');
+                const localAvatar = localStorage.getItem('userAvatar_' + uid);
+                avatarImg.src = localAvatar || `https://ui-avatars.com/api/?name=${encodedName}&background=2563eb&color=fff`;
+            }
         } else {
-            // Profile not found but user is authenticated
+            // Profile not found - Initialize with basic auth info
+            MOCK_USER.role = 'พนักงาน';
             MOCK_USER.permissions = getPermissionsByRole('พนักงาน');
-            applyUserPermissions();
+            console.warn("Profile not found in DB for UID:", uid);
         }
+        
+        applyUserPermissions();
     } catch (e) {
         console.error("Error loading user profile:", e);
         // Still keep uuid from auth so check-in works
@@ -118,7 +131,7 @@ async function loadCurrentUserProfile(uid) {
     }
 }
 
-// กำหนดสิทธิ์ตาม Role
+// กำหนดสิทธิ์ตาม Role (ค่าเริ่มต้นกรณีไม่ได้ทำ Custom Permissions)
 function getPermissionsByRole(role) {
     const allMenus = [
         'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'manage-shifts',
@@ -138,8 +151,15 @@ function getPermissionsByRole(role) {
         'my-requests', 'profile'
     ];
     
-    if (role === 'HR Admin') return allMenus;
-    if (role === 'หัวหน้างาน') return supervisorMenus;
+    // Normalize role name
+    const r = (role || '').toLowerCase().trim();
+    
+    // ตรวจสอบทั้งภาษาอังกฤษและภาษาไทย
+    const isAdmin = r === 'hr admin' || r === 'admin' || r.includes('admin') || r === 'hr administrator' || r === 'ผู้ดูแลระบบ';
+    const isSupervisor = r === 'หัวหน้างาน' || r.includes('หัวหน้า') || r === 'supervisor' || r === 'หัวหน้า';
+
+    if (isAdmin) return allMenus;
+    if (isSupervisor) return supervisorMenus;
     return employeeMenus;
 }
 
@@ -148,10 +168,10 @@ function applyUserPermissions() {
     const perms = MOCK_USER.permissions || [];
     
     // Check and hide/show page items
-    document.querySelectorAll('.sidebar-nav .nav-item[data-page], .sidebar-nav .nav-child[data-page]').forEach(item => {
+    document.querySelectorAll('.sidebar-nav .nav-item[data-page], .sidebar-nav .nav-child[data-page], .header-user-dropdown .dropdown-item[data-page]').forEach(item => {
         const page = item.getAttribute('data-page');
         if (perms.includes(page) || page === 'profile') {
-            item.style.display = ''; // restore default
+            item.style.display = 'flex';
         } else {
             item.style.display = 'none'; // hide if no permission
         }
@@ -291,6 +311,9 @@ window.navigateTo = function (pageId, element, isChild = false) {
     } else if (pageId === 'audit-log') {
         loadAuditLog();
         if (clockIntervalId) clearInterval(clockIntervalId);
+    } else if (pageId === 'settings') {
+        loadSystemSettings();
+        if (clockIntervalId) clearInterval(clockIntervalId);
     } else {
         if (clockIntervalId) clearInterval(clockIntervalId);
     }
@@ -301,6 +324,21 @@ window.toggleNavGroup = function (element) {
     const group = element.parentElement;
     group.classList.toggle('expanded');
 };
+
+// ─── Header Dropdown ────────────────────────────────
+window.toggleUserDropdown = function() {
+    const dropdown = document.getElementById('user-dropdown-menu');
+    if (dropdown) dropdown.classList.toggle('active');
+};
+
+// Close dropdown if clicked outside
+document.addEventListener('click', (e) => {
+    const userHeader = document.querySelector('.header-user');
+    const dropdown = document.getElementById('user-dropdown-menu');
+    if (userHeader && !userHeader.contains(e.target)) {
+        if (dropdown) dropdown.classList.remove('active');
+    }
+});
 
 // ─── Mobile Sidebar Toggle ────────────────────────────
 window.toggleSidebar = function () {
@@ -328,9 +366,14 @@ window.refreshPageData = function () {
 
 window.logout = async function () {
     if (confirm('คุณต้องการออกจากระบบใช่หรือไม่?')) {
-        console.log('Logging out...');
-        await supabase.auth.signOut();
-        window.location.href = 'login.html';
+        try {
+            console.log('[Auth] Logging out...');
+            await supabase.auth.signOut();
+        } catch (err) {
+            console.error('[Auth] Logout error:', err);
+        } finally {
+            window.location.href = 'login.html';
+        }
     }
 };
 
@@ -354,25 +397,33 @@ function updateCheckinColors(type) {
     const btnCo = document.getElementById('btn-co');
     if (!btnCi || !btnCo) return;
 
-    // Reset classes
+    // Reset base classes
     btnCi.className = 'btn btn-checkin';
-    btnCo.className = 'btn btn-checkout';
+    btnCo.className = 'btn btn-checkout btn-outline';
+    
+    // Clear custom styles
     btnCi.style.boxShadow = '';
+    btnCo.style.borderColor = '';
+    btnCo.style.color = '';
     
     if (type === 'normal') {
         btnCi.classList.add('btn-primary');
-        btnCo.classList.add('btn-outline');
-        btnCi.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+        btnCi.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.4)';
+        btnCo.style.borderColor = 'var(--primary)';
+        btnCo.style.color = 'var(--primary)';
     } else if (type === 'ot') {
         btnCi.classList.add('btn-warning');
-        btnCo.classList.add('btn-outline');
-        btnCi.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)';
+        btnCi.style.boxShadow = '0 6px 20px rgba(245, 158, 11, 0.4)';
+        btnCo.style.borderColor = '#f59e0b';
+        btnCo.style.color = '#d97706';
     } else if (type === 'shift') {
         btnCi.classList.add('btn-info');
-        btnCo.classList.add('btn-outline');
-        btnCi.style.boxShadow = '0 4px 12px rgba(10, 187, 135, 0.3)';
+        btnCi.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.4)';
+        btnCo.style.borderColor = '#10b981';
+        btnCo.style.color = '#059669';
     }
 }
+
 
 function updateCheckinClock() {
     const n = new Date();
@@ -452,22 +503,45 @@ async function submitCheckin(type) {
 
     const btnId = type === 'Check-in' ? 'btn-ci' : 'btn-co';
     const btn = document.getElementById(btnId);
+    if (!btn) return;
     const originalHtml = btn.innerHTML;
 
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
 
     try {
-        const R = 6371e3; // metres
-        // No workplace distance check needed
-        const distance = 0;
-        const status = 'ปกติ';
-
         const realUserId = MOCK_USER.uuid;
-        if (!realUserId) {
-            throw new Error('ไม่พบข้อมูลผู้ใช้ กรุณาล็อกอินใหม่');
+        if (!realUserId) throw new Error('ไม่พบข้อมูลผู้ใช้ กรุณาล็อกอินใหม่');
+
+        // Fetch workplaces if needed
+        if (workplacesData.length === 0) {
+            const { data, error } = await supabase.from('workplaces').select('*').eq('status', 'ใช้งาน');
+            if (!error && data) workplacesData = data;
         }
-        
+
+        let closestWp = null;
+        let minDistance = Infinity;
+
+        workplacesData.forEach(wp => {
+            const dist = calculateDistance(currentLat, currentLng, wp.lat, wp.lng);
+            if (dist < minDistance) {
+                minDistance = dist;
+                closestWp = wp;
+            }
+        });
+
+        let status = 'ปกติ';
+        let workplaceId = closestWp ? closestWp.id : null;
+        const distanceVal = closestWp ? minDistance : 0;
+
+        if (closestWp) {
+            if (minDistance > closestWp.radius) {
+                status = 'นอกพิกัด';
+            }
+        } else {
+            status = 'ไม่พบสถานที่';
+        }
+
         let finalNote = note;
         if (checkinCategory !== 'เวลาปกติ') {
             finalNote = `[${checkinCategory}] ${note}`.trim();
@@ -475,24 +549,27 @@ async function submitCheckin(type) {
 
         const payload = {
             user_id: realUserId,
-            workplace_id: null,
+            workplace_id: workplaceId,
             type: type,
             lat: currentLat,
             lng: currentLng,
-            distance_meters: Math.round(distance),
+            distance_meters: Math.round(distanceVal),
             status: status,
             note: finalNote,
-            date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD
-            time: new Date().toLocaleTimeString('en-GB') // HH:mm:ss
+            date: new Date().toLocaleDateString('en-CA'),
+            time: new Date().toLocaleTimeString('en-GB')
         };
 
         const { error: insertError } = await supabase.from('attendance_logs').insert([payload]);
         if (insertError) throw insertError;
 
+        // Log Activity
+        logActivity(`${type} (${checkinCategory})`, `Location: ${closestWp ? closestWp.name : 'Unknown'}, Status: ${status}, Distance: ${Math.round(distanceVal)}m`);
+
         setTimeout(() => {
             btn.disabled = false;
             btn.innerHTML = originalHtml;
-            alert(`ทำรายการ ${type} (${checkinCategory}) สำเร็จ!`);
+            alert(`ทำรายการ ${type} (${checkinCategory}) สำเร็จ!\nสถานที่: ${closestWp ? closestWp.name : 'ทั่วไป'}\nสถานะ: ${status}`);
             updateCheckinStatusCard(type, checkinCategory);
         }, 800);
 
@@ -503,6 +580,7 @@ async function submitCheckin(type) {
         alert('เชื่อมต่อล้มเหลว: ' + error.message);
     }
 }
+
 
 function updateCheckinStatusCard(type, category) {
     const stBox = document.querySelector('.checkin-status');
@@ -648,7 +726,7 @@ function loadDashLeaveCalendar() {
             ? 'background: linear-gradient(135deg, #007AFF, #5856D6); color: white; font-weight: 700; border-radius: 12px;' 
             : `border-radius: 10px; ${isSun ? 'color:#FF3B30;' : ''} ${isSat ? 'color:#007AFF;' : ''}`;
         
-        html += `<div style="min-height:72px; padding:6px; text-align:center; cursor:default; ${todayStyle} transition: background 0.2s;">
+        html += `<div style="min-height:72px; padding:6px; text-align:center; cursor:pointer; ${todayStyle} transition: background 0.2s;" onclick="navigateTo('report-leave', document.querySelector('[data-page=report-leave]'), true)">
             <div style="font-size:14px; font-weight:${isToday?'700':'500'}; margin-bottom:2px;">${d}</div>
             ${leaveHtml}
         </div>`;
@@ -783,9 +861,26 @@ async function fetchDashboardStats() {
             outOfRange: outOfRange
         });
 
+        // 4. Fetch 5 recent activity for the dashboard list
+        const { data: recentLogs, error: errRecent } = await supabase
+            .from('attendance_logs')
+            .select(`
+                *,
+                profiles:user_id (full_name, employee_id)
+            `)
+            .order('created_at', { ascending: false })
+            .limit(5);
+        
+        if (!errRecent && recentLogs) {
+            renderDashActivity(recentLogs);
+        }
+
     } catch (error) {
         console.error("Failed to load dashboard stats from Supabase:", error.message);
-        // Fallback to mock if entirely fresh DB to prevent empty dashboard
+        // Fallback or error UI
+        const activityEl = document.getElementById('dash-recent-activity');
+        if(activityEl) activityEl.innerHTML = '<div style="padding:24px; text-align:center; color:var(--danger);">ไม่สามารถโหลดข้อมูลกิจกรรมได้</div>';
+        
         updateDashboardUI({
             totalEmployees: 0,
             totalCheckins: 0,
@@ -795,6 +890,50 @@ async function fetchDashboardStats() {
         });
     }
 }
+
+function renderDashActivity(logs) {
+    const activityEl = document.getElementById('dash-recent-activity');
+    if(!activityEl) return;
+
+    if(logs.length === 0) {
+        activityEl.innerHTML = '<div style="padding:24px; text-align:center; color:var(--text-muted);">ไม่มีกิจกรรมล่าสุด</div>';
+        return;
+    }
+
+    let html = '';
+    logs.forEach(log => {
+        const time = log.time ? log.time.substring(0, 5) : '--:--';
+        const name = log.profiles ? log.profiles.full_name : 'ไม่ทราบชื่อ';
+        const empId = log.profiles ? log.profiles.employee_id : '-';
+        const type = log.type === 'Check-in' ? '<span style="color:var(--success)">เข้างาน</span>' : '<span style="color:var(--danger)">ออกงาน</span>';
+        
+        let statusBadge = '';
+        if(log.status === 'ปกติ') statusBadge = '<span class="badge badge-success">ปกติ</span>';
+        else if(log.status === 'สาย') statusBadge = '<span class="badge badge-warning">สาย</span>';
+        else statusBadge = `<span class="badge badge-danger">${log.status}</span>`;
+
+        html += `
+            <div style="display:flex; align-items:center; gap:16px; padding:12px 20px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.2s;" 
+                 onclick="navigateTo('records', document.querySelector('[data-page=records]'))"
+                 onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                <div style="width:40px; height:40px; border-radius:50%; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px;">
+                    ${name.substring(0, 1)}
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:14px; font-weight:600; color:var(--text-main);">${name} <small style="font-weight:normal; color:var(--text-muted); ml-4">(${empId})</small></div>
+                    <div style="font-size:12px; color:var(--text-muted); display:flex; gap:8px; align-items:center;">
+                        ${type} • ${time} น. • ${log.workplace_name || 'ไม่ระบุสถานที่'}
+                    </div>
+                </div>
+                <div>
+                   ${statusBadge}
+                </div>
+            </div>
+        `;
+    });
+    activityEl.innerHTML = html;
+}
+
 
 function updateDashboardUI(data) {
     const total = data.totalEmployees || 0;
@@ -984,44 +1123,31 @@ async function saveUser() {
     const fname = document.getElementById('u-fname').value.trim();
     const lname = document.getElementById('u-lname').value.trim();
     
-    if (!fname) {
-        alert('กรุณากรอกชื่อจริง');
-        return;
-    }
-    if (!lname) {
-        alert('กรุณากรอกนามสกุล');
-        return;
-    }
+    if (!fname) return alert('กรุณากรอกชื่อจริง');
+    if (!lname) return alert('กรุณากรอกนามสกุล');
     
     const fullName = fname + ' ' + lname;
     const username = document.getElementById('u-username').value.trim();
-    
-    if (!username) {
-        alert('กรุณากรอกชื่อผู้ใช้ (Username) สำหรับใช้เข้าสู่ระบบ');
-        return;
-    }
+    if (!username) return alert('กรุณากรอกชื่อผู้ใช้ (Username)');
     
     const payload = {
         employee_id: document.getElementById('u-empid').value.trim(),
         full_name: fullName,
-        email: document.getElementById('u-email').value.trim(), // Real email for password reset
+        email: document.getElementById('u-email').value.trim(),
         username: username,
         role: document.getElementById('u-role').value,
+        department: document.getElementById('u-department').value,
         primary_shift: document.getElementById('u-shift').value.trim(),
-        status: document.getElementById('u-status').value
+        status: document.getElementById('u-status').value,
+        accessible_menus: selectedPerms // This will be stored as JSONB
     };
+    
     const orgId = document.getElementById('u-original-id').value;
-
-    if (!payload.employee_id) {
-        alert('กรุณากรอกรหัสพนักงาน');
-        return;
-    }
-
     const isEdit = orgId !== '';
 
     closeModal('user-modal');
     const tbody = document.getElementById('users-table-body');
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกข้อมูล...</td></tr>';
+    if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึกข้อมูล...</td></tr>';
 
     try {
         if (isEdit) {
@@ -1030,64 +1156,46 @@ async function saveUser() {
                 .update(payload)
                 .eq('employee_id', orgId);
             if (error) throw error;
+            
+            logActivity('Edit User', `Updated profile for ${fullName} (${payload.employee_id})`);
             alert('แก้ไขข้อมูลสำเร็จ!');
         } else {
-            // For new employees: create auth user with synthetic email from username
-            let insertSuccess = false;
-            
-            // Construct synthetic email from username for Supabase Auth
+            // New user registration
             const syntheticEmail = usernameToEmail(username);
             const defaultPassword = payload.employee_id + '@Neo2026';
             
+            // Note: In real production, use a service role client to avoid switching sessions
+            // For this demo, we use the standard signup. If the admin is logged out, they may need to re-login.
             const { data: authData, error: authError } = await supabase.auth.signUp({
                 email: syntheticEmail,
-                password: defaultPassword
+                password: defaultPassword,
+                options: {
+                    data: { full_name: fullName }
+                }
             });
             
-            if (!authError && authData?.user) {
-                // Now insert profile with the auth user's id
-                const profilePayload = { ...payload, id: authData.user.id };
+            if (authError) throw authError;
+            
+            if (authData?.user) {
+                // profile insert
                 const { error: profileError } = await supabase
                     .from('profiles')
-                    .upsert([profilePayload]);
+                    .upsert([{ ...payload, id: authData.user.id }]);
                 
-                if (profileError) {
-                    console.warn('Profile insert error:', profileError.message);
-                } else {
-                    insertSuccess = true;
-                }
-            } else {
-                console.warn('Auth signUp failed:', authError?.message);
+                if (profileError) throw profileError;
+                
+                logActivity('Create User', `Created new user ${fullName} (${payload.employee_id})`);
+                alert(`บันทึกสำเร็จ! Username: ${username} / รหัสผ่าน: ${defaultPassword}`);
             }
-            
-            if (!insertSuccess) {
-                // Fallback: save to localStorage for testing
-                const localUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
-                localUsers.push({
-                    id: 'local-' + Date.now(),
-                    ...payload,
-                    created_at: new Date().toISOString()
-                });
-                localStorage.setItem('localUsers', JSON.stringify(localUsers));
-                console.log('User saved to localStorage (fallback)');
-            }
-            alert(`บันทึกสำเร็จ! Username: ${username} / รหัสผ่านเริ่มต้น: ${defaultPassword}`);
         }
-        loadUsers();
     } catch (error) {
         console.error('Error saving user:', error.message);
-        // Still save locally as fallback
-        const localUsers = JSON.parse(localStorage.getItem('localUsers') || '[]');
-        localUsers.push({
-            id: 'local-' + Date.now(),
-            ...payload,
-            created_at: new Date().toISOString()
-        });
-        localStorage.setItem('localUsers', JSON.stringify(localUsers));
-        alert('บันทึกในเครื่อง (ออฟไลน์) สำเร็จ! (Supabase: ' + error.message + ')');
+        alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + error.message);
+    } finally {
         loadUsers();
     }
 }
+
 
 async function deleteUser(empId) {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบพนักงานรหัส: ' + empId + ' ?')) return;
@@ -1429,7 +1537,7 @@ let currentManageMonth = new Date();
 let myShiftsMap = {}; // store date => shift data
 let swapRequestsList = []; // mock DB for swap requests
 
-function loadShifts() {
+async function loadShifts() {
     renderCalendar();
     loadSwapRequests();
 
@@ -1437,22 +1545,42 @@ function loadShifts() {
     const m = currentShiftsDate.getMonth();
     myShiftsMap = {};
 
-    // Load shift assignments from localStorage (saved by manage-shifts)
+    console.log(`[Shifts] Fetching shifts for ${MOCK_USER.uuid} (${y}-${m+1})`);
+
     try {
+        const firstDay = new Date(y, m, 1).toISOString().split('T')[0];
+        const lastDay = new Date(y, m + 1, 0).toISOString().split('T')[0];
+
+        const { data, error } = await supabase
+            .from('shifts')
+            .select('*')
+            .eq('user_id', MOCK_USER.uuid)
+            .gte('date', firstDay)
+            .lte('date', lastDay);
+
+        if (error) throw error;
+
+        if (data) {
+            data.forEach(row => {
+                const ds = new Date(row.date);
+                const dateKey = ds.toDateString();
+                myShiftsMap[dateKey] = row.shift_code;
+            });
+        }
+    } catch(e) {
+        console.warn('[Shifts] DB fetch failed, using local fallback:', e.message);
         const saved = JSON.parse(localStorage.getItem('shiftAssignments') || '{}');
         Object.keys(saved).forEach(dateStr => {
             const ds = new Date(dateStr);
             if (ds.getFullYear() === y && ds.getMonth() === m) {
-                const assignment = saved[dateStr];
-                myShiftsMap[dateStr] = assignment;
+                myShiftsMap[ds.toDateString()] = saved[dateStr];
             }
         });
-    } catch(e) {
-        console.warn('Could not load shift assignments:', e);
     }
 
     renderCalendar();
 }
+
 
 function changeMonth(dir) {
     currentShiftsDate.setMonth(currentShiftsDate.getMonth() + dir);
@@ -1557,60 +1685,86 @@ function loadManageShifts() {
 }
 
 function renderManageShiftsTable() {
-    const daysInMon = new Date(currentManageMonth.getFullYear(), currentManageMonth.getMonth() + 1, 0).getDate();
-    let headerHtml = '<th style="position: sticky; left: 0; background: var(--bg-body); z-index: 2;">พนักงาน</th>';
+    const year = currentManageMonth.getFullYear();
+    const month = currentManageMonth.getMonth();
+    const daysInMon = new Date(year, month + 1, 0).getDate();
+    
+    let headerHtml = '<th style="position: sticky; left: 0; background: #f8fafc; z-index: 25; border-right: 2px solid var(--border); box-shadow: 2px 0 5px rgba(0,0,0,0.05);">พนักงาน</th>';
     for(let d=1; d<=daysInMon; d++) {
-        headerHtml += `<th style="text-align:center; min-width: 50px; font-weight: normal; font-size: 11px;">${d}</th>`;
+        const dateObj = new Date(year, month, d);
+        const dayOfWeek = dateObj.getDay(); // 0=Sun, 6=Sat
+        const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+        const bg = isWeekend ? '#fff1f2' : 'var(--bg-main)';
+        const color = isWeekend ? '#e11d48' : 'inherit';
+        
+        headerHtml += `<th style="text-align:center; min-width: 55px; font-weight: 600; font-size: 11px; background: ${bg}; color: ${color}; border-right: 1px solid #f1f5f9;">${d}</th>`;
     }
-    headerHtml += '<th>ลบ</th>';
+    headerHtml += '<th style="position: sticky; right: 0; background: #f8fafc; z-index: 20; border-left: 1px solid var(--border);">ลบ</th>';
+
 
     let bodyHtml = '';
     if(manualShiftData.length === 0) {
         bodyHtml = `<tr><td colspan="${daysInMon + 2}" style="text-align:center; padding: 40px; color: var(--text-muted);">
             <i class="fa-solid fa-calendar-days" style="font-size: 48px; margin-bottom: 16px; color: #cbd5e1;"></i>
-            <p>ยังไม่มีพนักงานในตาราง คลิก 'เลือกพนักงานลงตาราง' หรือ 'AI จัดกะให้อัตโนมัติ'</p>
+            <p>ยังไม่มีพนักงานในตาราง คลิก 'เลือกพนักงานลงตาราง'</p>
         </td></tr>`;
     } else {
         manualShiftData.forEach((empRow, empIdx) => {
-             bodyHtml += `<tr><td style="position: sticky; left: 0; background: #fff; z-index: 1;"><strong>${empRow.empName}</strong></td>`;
+             bodyHtml += `<tr><td style="position: sticky; left: 0; background: white; z-index: 5; border-right: 2px solid var(--border); font-weight: 600;">${empRow.empName}</td>`;
              for(let d=1; d<=daysInMon; d++) {
                  let shiftVal = empRow.shifts[d-1] || 'O';
-                 let color = shiftVal==='O'?'var(--text-muted)': (shiftVal==='D'?'#6d28d9': (shiftVal==='N'?'var(--primary)': (shiftVal==='M'?'var(--success)': 'var(--warning)')));
-                 bodyHtml += `<td style="text-align:center; padding: 0;">
-                    <select class="form-control" style="width:100%; height:100%; border:none; padding: 8px 4px; background: transparent; font-weight:bold; color:${color}; cursor:pointer; text-align:center; appearance: none;" onchange="updateManualShift(${empIdx}, ${d-1}, this.value)">
+                 // Color mapping
+                 let color = 'var(--text-main)';
+                 if(shiftVal === 'O') color = 'var(--text-muted)';
+                 else if(shiftVal === 'D' || shiftVal === 'Day') color = 'var(--primary)';
+                 else if(shiftVal === 'N' || shiftVal === 'Night') color = '#1e293b';
+                 else if(shiftVal === 'Sat') color = '#f59e0b';
+                 else if(shiftVal === 'Sun') color = '#ef4444';
+                 else if(shiftVal === 'M') color = 'var(--success)';
+                 else if(shiftVal === 'A') color = 'var(--warning)';
+
+                 bodyHtml += `<td style="text-align:center; padding: 0; border: 1px solid #f1f5f9;">
+                    <select class="form-control" style="width:100%; height:100%; border:none; padding: 4px 2px; background: transparent; font-weight:bold; color:${color}; cursor:pointer; text-align:center; appearance: none; font-size: 12px; min-width: 50px;" onchange="updateManualShift(${empIdx}, ${d-1}, this.value)">
+                      <option value="D" ${shiftVal==='D'?'selected':''} style="color:var(--primary)">D</option>
+                      <option value="N" ${shiftVal==='N'?'selected':''} style="color:#1e293b">N</option>
+                      <option value="O" ${shiftVal==='O'?'selected':''} style="color:var(--text-muted)">O</option>
+                      <option value="Sat" ${shiftVal==='Sat'?'selected':''} style="color:#f59e0b">Sat</option>
+                      <option value="Sun" ${shiftVal==='Sun'?'selected':''} style="color:#ef4444">Sun</option>
                       <option value="M" ${shiftVal==='M'?'selected':''} style="color:var(--success)">M</option>
                       <option value="A" ${shiftVal==='A'?'selected':''} style="color:var(--warning)">A</option>
-                      <option value="N" ${shiftVal==='N'?'selected':''} style="color:var(--primary)">N</option>
-                      <option value="D" ${shiftVal==='D'?'selected':''} style="color:#6d28d9">D</option>
-                      <option value="O" ${shiftVal==='O'?'selected':''} style="color:var(--text-muted)">O</option>
                     </select>
                  </td>`;
              }
-             bodyHtml += `<td style="text-align:center;"><button class="btn-icon text-danger" onclick="removeEmpFromShift(${empIdx})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+             bodyHtml += `<td style="text-align:center; position: sticky; right: 0; background: white;"><button class="btn-icon text-danger" onclick="removeEmpFromShift(${empIdx})"><i class="fa-solid fa-trash"></i></button></td></tr>`;
         });
     }
 
     const container = document.getElementById('manage-shifts-table-container');
     container.innerHTML = `
-        <div style="padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-            <div style="display:flex; gap:8px;">
-                <span style="font-size:13px;" class="text-muted"><strong class="text-success">M</strong>=เช้า, <strong class="text-warning">A</strong>=บ่าย, <strong class="text-primary">N</strong>=ค่ำ, <strong style="color:#6d28d9">D</strong>=ดึก, <strong>O</strong>=หยุด</span>
+        <div style="padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; background: #fafafa;">
+            <div style="display:flex; gap:12px; flex-wrap: wrap;">
+                <span class="badge" style="background:#e0f2fe; color:var(--primary);">D=Day</span>
+                <span class="badge" style="background:#f1f5f9; color:#1e293b;">N=Night</span>
+                <span class="badge" style="background:#fef3c7; color:#f59e0b;">Sat=เสาร์</span>
+                <span class="badge" style="background:#fee2e2; color:#ef4444;">Sun=อาทิตย์</span>
+                <span class="badge" style="background:#f3f4f6; color:var(--text-muted);">O=หยุด</span>
             </div>
             ${manualShiftData.length > 0 ? `
             <div style="display:flex; gap:8px;">
-               <button class="btn btn-outline text-warning" onclick="validateManualShifts()"><i class="fa-solid fa-shield-halved"></i> ตรวจสอบเงื่อนไข</button>
-               <button class="btn btn-primary" onclick="alert('บันทึกการจัดกะสำเร็จ ระบบจะอัปเดตไปยังปฏิทินของพนักงานแต่ละคน')"><i class="fa-solid fa-save"></i> บันทึกและประกาศกะ</button>
+               <button class="btn btn-primary" id="btn-publish-shifts" onclick="saveManageShifts()" style="padding: 8px 16px; font-size: 13px;"><i class="fa-solid fa-save"></i> บันทึกและประกาศกะ</button>
             </div>
             ` : ''}
         </div>
-        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-            <table class="data-table" style="font-size: 13px; text-align: center; white-space: nowrap;">
+        <div class="table-responsive" style="max-height: 600px; overflow: auto; border: 1px solid var(--border); border-top: none;">
+            <table class="data-table" style="font-size: 13px; text-align: center; white-space: nowrap; width: auto; min-width: 100%;">
                 <thead><tr>${headerHtml}</tr></thead>
                 <tbody>${bodyHtml}</tbody>
             </table>
         </div>
     `;
 }
+
+
 
 function updateManualShift(empIdx, dayIdx, val) {
     manualShiftData[empIdx].shifts[dayIdx] = val;
@@ -1639,7 +1793,7 @@ function addEmployeeToShiftTable() {
         const isAlready = alreadyInTable.includes(u.name);
         return `
             <label class="shift-emp-item" style="display:flex; align-items:center; gap:12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: ${isAlready ? 'not-allowed' : 'pointer'}; opacity: ${isAlready ? '0.5' : '1'}; background: ${isAlready ? '#f1f5f9' : 'white'};" data-name="${u.name}">
-                <input type="checkbox" value="${u.name}" ${isAlready ? 'disabled checked' : ''} style="width:18px; height:18px; accent-color: var(--primary);">
+                <input type="checkbox" value="${u.id}" data-empname="${u.name}" ${isAlready ? 'disabled checked' : ''} style="width:18px; height:18px; accent-color: var(--primary);">
                 <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&color=fff&background=3b82f6&size=32" style="width:32px; height:32px; border-radius: 50%;" alt="">
                 <div style="flex:1;">
                     <div style="font-weight:600; font-size:14px;">${u.name}</div>
@@ -1649,6 +1803,7 @@ function addEmployeeToShiftTable() {
             </label>
         `;
     }).join('');
+
 
     openModal('shift-emp-picker-modal');
 }
@@ -1667,9 +1822,12 @@ function confirmShiftEmpPicker() {
 
     const daysInMon = new Date(currentManageMonth.getFullYear(), currentManageMonth.getMonth() + 1, 0).getDate();
     checked.forEach(cb => {
-        if(!manualShiftData.find(e => e.empName === cb.value)) {
+        const uuid = cb.value;
+        const name = cb.getAttribute('data-empname');
+        if(!manualShiftData.find(e => e.userId === uuid)) {
             manualShiftData.push({
-                empName: cb.value,
+                userId: uuid,
+                empName: name,
                 shifts: Array(daysInMon).fill('O')
             });
         }
@@ -1678,6 +1836,49 @@ function confirmShiftEmpPicker() {
     closeModal('shift-emp-picker-modal');
     renderManageShiftsTable();
 }
+
+async function saveManageShifts() {
+    confirmAction('ยืนยันหน้าการประกาศตารางกะงาน?', 'พนักงานจะเริ่มเห็นตารางงานของตนเองทันทีบนปฏิทินของระบบ', async () => {
+        const btn = document.getElementById('btn-publish-shifts');
+        if(!btn) return;
+        const orgHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
+        btn.disabled = true;
+
+        const year = currentManageMonth.getFullYear();
+        const month = currentManageMonth.getMonth();
+        const daysInMon = new Date(year, month + 1, 0).getDate();
+
+        const payloads = [];
+        manualShiftData.forEach(empRow => {
+            empRow.shifts.forEach((shiftCode, idx) => {
+                // date format YYYY-MM-DD
+                const d = idx + 1;
+                const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                payloads.push({
+                    user_id: empRow.userId,
+                    date: formattedDate,
+                    shift_code: shiftCode,
+                    status: 'published'
+                });
+            });
+        });
+
+        try {
+            const { error } = await supabase.from('shifts').upsert(payloads, { onConflict: 'user_id, date' });
+            if(error) throw error;
+            
+            alert('บันทึกและประกาศตารางกะงานเรียบร้อยแล้ว');
+        } catch(e) {
+            console.error('[ManageShifts] Save failed:', e);
+            alert('ไม่สามารถบันทึกตารางงานได้: ' + e.message);
+        } finally {
+            btn.innerHTML = orgHtml;
+            btn.disabled = false;
+        }
+    });
+}
+
 
 function validateManualShifts() {
     const rules = [];
@@ -2438,7 +2639,7 @@ function renderLeaveReport(data) {
     }
 
     tbody.innerHTML = data.map(r => {
-        let statusBadge = r.status === 'approved' ? '<span class="badge badge-success">อนุมัติแล้ว</span>' : '<span class="badge badge-danger">ไม่อนุมัติ</span>';
+        let statusBadge = r.status === 'approved' ? '<span class="badge badge-success">อนุมัติแล้ว</span>' : '<span class="badge badge-danger">ไม่อนุมัติแล้ว</span>';
         let icon = r.type === 'leave' ? '<i class="fa-solid fa-suitcase-medical text-primary"></i>' : '<i class="fa-solid fa-clock text-warning"></i>';
 
         return `
@@ -2640,8 +2841,8 @@ async function loadProfileData() {
             .from('profiles')
             .select('*')
             .eq('id', MOCK_USER.uuid)
-            .single();
-            
+            .maybeSingle();
+
         if (error) throw error;
         
         if (data) {
@@ -2653,32 +2854,38 @@ async function loadProfileData() {
             statusEl.textContent = data.status || 'ใช้งาน';
             statusEl.className = data.status === 'ใช้งาน' ? 'badge badge-success' : 'badge badge-danger';
             
-            // Generate Avatar
+            // Avatar
+            const localAvatar = localStorage.getItem('userAvatar_' + MOCK_USER.uuid);
+            const avatarImg = document.getElementById('profile-img-preview');
             const encodedName = encodeURIComponent(data.full_name || 'User');
-            document.getElementById('profile-img-preview').src = `https://ui-avatars.com/api/?name=${encodedName}&background=2563eb&color=fff`;
+            if (avatarImg) {
+                avatarImg.src = localAvatar || `https://ui-avatars.com/api/?name=${encodedName}&background=2563eb&color=fff`;
+            }
             
             // Populate Form
             document.getElementById('prof-empid').value = data.employee_id || '';
             document.getElementById('prof-name').value = data.full_name || '';
             document.getElementById('prof-email').value = data.email || '';
             document.getElementById('prof-role').value = data.role || '';
-            // For custom fields like phone & department, assume they might exist in profiles table (or need to be added). 
-            // We use simple fallback to empty string if not present.
             document.getElementById('prof-phone').value = data.phone || '';
             document.getElementById('prof-department').value = data.department || '';
             
             // Signature Load
             const sigB64 = data.signature_base64 || '';
-            document.getElementById('prof-signature_base64').value = sigB64;
+            const sigInput = document.getElementById('prof-signature_base64');
+            if (sigInput) sigInput.value = sigB64;
+            
             const preImg = document.getElementById('saved-signature-preview');
             const noSigTxt = document.getElementById('no-signature-text');
-            if (sigB64) {
-                preImg.src = sigB64;
-                preImg.style.display = 'block';
-                noSigTxt.style.display = 'none';
-            } else {
-                preImg.style.display = 'none';
-                noSigTxt.style.display = 'block';
+            if (preImg && noSigTxt) {
+                if (sigB64) {
+                    preImg.src = sigB64;
+                    preImg.style.display = 'block';
+                    noSigTxt.style.display = 'none';
+                } else {
+                    preImg.style.display = 'none';
+                    noSigTxt.style.display = 'block';
+                }
             }
         }
         
@@ -3058,11 +3265,28 @@ function exportDocToPDF() {
 
 // ─── SYSTEM SETTINGS (THEME & LOGO) ───
 
-function loadSystemSettings() {
-    const lsSettings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+async function loadSystemSettings() {
+    console.log('[Settings] Loading from database...');
+    let settings = {};
     
+    try {
+        const { data, error } = await supabase.from('system_settings').select('*');
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+            data.forEach(row => {
+                settings[row.key] = row.value;
+            });
+        } else {
+            settings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+        }
+    } catch (e) {
+        console.warn('[Settings] DB fetch failed, using local fallback:', e);
+        settings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+    }
+
     // 1. Apply Theme
-    const themeMode = lsSettings.themeMode || 'light';
+    const themeMode = settings.themeMode || 'light';
     if(themeMode === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
     } else {
@@ -3072,7 +3296,7 @@ function loadSystemSettings() {
     if(themeInput) themeInput.value = themeMode;
 
     // 2. Apply Custom Logo
-    const logoBase64 = lsSettings.logoBase64;
+    const logoBase64 = settings.logoBase64;
     const sidebarLogoText = document.querySelector('.sidebar-header h2');
     if (logoBase64) {
         const logoPreview = document.getElementById('st-logo-preview');
@@ -3090,7 +3314,7 @@ function loadSystemSettings() {
     }
 
     // 3. Apply Watermark
-    const watermarkBase64 = lsSettings.watermarkBase64;
+    const watermarkBase64 = settings.watermarkBase64;
     const wrapper = document.querySelector('.main-content');
     if (watermarkBase64) {
         const wmPreview = document.getElementById('st-watermark-preview');
@@ -3104,7 +3328,6 @@ function loadSystemSettings() {
            wrapper.style.backgroundPosition = 'center';
            wrapper.style.backgroundSize = '200px'; 
            wrapper.style.backgroundBlendMode = 'overlay';
-           // Dark mode contrast helper
            if(themeMode === 'dark') {
                 wrapper.style.backgroundColor = 'rgba(30, 41, 59, 0.9)';
            } else {
@@ -3117,34 +3340,34 @@ function loadSystemSettings() {
         }
     }
 
-    // 4. Update Inputs if on settings page
-    if (lsSettings.timeIn && document.getElementById('st-time-in')) document.getElementById('st-time-in').value = lsSettings.timeIn;
-    if (lsSettings.timeOut && document.getElementById('st-time-out')) document.getElementById('st-time-out').value = lsSettings.timeOut;
-    if (lsSettings.lateGrace && document.getElementById('st-late-grace')) document.getElementById('st-late-grace').value = lsSettings.lateGrace;
-    if (lsSettings.wifi && document.getElementById('st-wifi')) document.getElementById('st-wifi').value = lsSettings.wifi;
-    if (lsSettings.photo && document.getElementById('st-photo')) document.getElementById('st-photo').value = lsSettings.photo;
+    // 4. Update Inputs
+    if (settings.timeIn && document.getElementById('st-time-in')) document.getElementById('st-time-in').value = settings.timeIn;
+    if (settings.timeOut && document.getElementById('st-time-out')) document.getElementById('st-time-out').value = settings.timeOut;
+    if (settings.lateGrace && document.getElementById('st-late-grace')) document.getElementById('st-late-grace').value = settings.lateGrace;
+    if (settings.wifi && document.getElementById('st-wifi')) document.getElementById('st-wifi').value = settings.wifi;
+    if (settings.photo && document.getElementById('st-photo')) document.getElementById('st-photo').value = settings.photo;
+    if (settings.leaveSick !== undefined && document.getElementById('st-leave-sick')) document.getElementById('st-leave-sick').value = settings.leaveSick;
+    if (settings.leavePersonal !== undefined && document.getElementById('st-leave-personal')) document.getElementById('st-leave-personal').value = settings.leavePersonal;
+    if (settings.leaveVacation !== undefined && document.getElementById('st-leave-vacation')) document.getElementById('st-leave-vacation').value = settings.leaveVacation;
+    if (settings.leaveMaxConsecutive !== undefined && document.getElementById('st-leave-max-consecutive')) document.getElementById('st-leave-max-consecutive').value = settings.leaveMaxConsecutive;
+    if (settings.departments && document.getElementById('st-departments')) document.getElementById('st-departments').value = settings.departments;
     
-    if (lsSettings.leaveSick !== undefined && document.getElementById('st-leave-sick')) document.getElementById('st-leave-sick').value = lsSettings.leaveSick;
-    if (lsSettings.leavePersonal !== undefined && document.getElementById('st-leave-personal')) document.getElementById('st-leave-personal').value = lsSettings.leavePersonal;
-    if (lsSettings.leaveVacation !== undefined && document.getElementById('st-leave-vacation')) document.getElementById('st-leave-vacation').value = lsSettings.leaveVacation;
-    if (lsSettings.leaveMaxConsecutive !== undefined && document.getElementById('st-leave-max-consecutive')) document.getElementById('st-leave-max-consecutive').value = lsSettings.leaveMaxConsecutive;
-    if (lsSettings.departments && document.getElementById('st-departments')) document.getElementById('st-departments').value = lsSettings.departments;
-    
-    // Load department tags UI
+    localStorage.setItem('systemAdminSettings', JSON.stringify(settings));
     loadDepartmentTagsFromSettings();
 }
 
-function saveSystemSettings() {
-    confirmAction('ยืนยันการบันทึกการตั้งค่าระบบ?', '', () => {
+async function saveSystemSettings() {
+    confirmAction('ยืนยันการบันทึกการตั้งค่าระบบ?', 'ข้อมูลจะถูกอัปเดตไปยังฐานข้อมูลส่วนกลาง', async () => {
         const btn = document.querySelector('#page-settings .btn-primary');
+        if (!btn) return;
         const originalHtml = btn.innerHTML;
         btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> กำลังบันทึก...';
         btn.disabled = true;
 
-        const currentSettings = JSON.parse(localStorage.getItem('systemAdminSettings') || '{}');
+        const logoPreview = document.getElementById('st-logo-preview');
+        const wmPreview = document.getElementById('st-watermark-preview');
 
         const newSettings = {
-            ...currentSettings,
             timeIn: document.getElementById('st-time-in')?.value,
             timeOut: document.getElementById('st-time-out')?.value,
             lateGrace: document.getElementById('st-late-grace')?.value,
@@ -3155,25 +3378,24 @@ function saveSystemSettings() {
             leaveSick: document.getElementById('st-leave-sick')?.value,
             leavePersonal: document.getElementById('st-leave-personal')?.value,
             leaveVacation: document.getElementById('st-leave-vacation')?.value,
-            leaveMaxConsecutive: document.getElementById('st-leave-max-consecutive')?.value
+            leaveMaxConsecutive: document.getElementById('st-leave-max-consecutive')?.value,
+            logoBase64: (logoPreview && logoPreview.style.display !== 'none') ? logoPreview.src : null,
+            watermarkBase64: (wmPreview && wmPreview.style.display !== 'none') ? wmPreview.src : null
         };
 
-        const logoPreview = document.getElementById('st-logo-preview');
-        if (logoPreview && logoPreview.style.display !== 'none' && logoPreview.src) {
-             newSettings.logoBase64 = logoPreview.src;
-        } else {
-             delete newSettings.logoBase64;
-        }
-
-        const wmPreview = document.getElementById('st-watermark-preview');
-        if (wmPreview && wmPreview.style.display !== 'none' && wmPreview.src) {
-             newSettings.watermarkBase64 = wmPreview.src;
-        } else {
-             delete newSettings.watermarkBase64;
-        }
-
         try {
+            const upsertPromises = Object.keys(newSettings).map(key => {
+                if (newSettings[key] === undefined) return Promise.resolve();
+                return supabase.from('system_settings').upsert({
+                    key: key,
+                    value: newSettings[key],
+                    updated_at: new Date().toISOString()
+                });
+            });
+
+            await Promise.all(upsertPromises);
             localStorage.setItem('systemAdminSettings', JSON.stringify(newSettings));
+            
             setTimeout(() => {
                 loadSystemSettings();
                 btn.innerHTML = originalHtml;
@@ -3183,11 +3405,12 @@ function saveSystemSettings() {
         } catch(e) {
             btn.innerHTML = originalHtml;
             btn.disabled = false;
-            alert('ไม่สามารถบันทึกได้ รูปภาพอาจมีขนาดใหญ่เกินไป โปรดเลือกลบแล้วอัปโหลดรูปที่เล็กลง');
+            alert('ไม่สามารถบันทึกได้: ' + e.message);
             console.error(e);
         }
     });
 }
+
 
 function previewThemeMode(mode) {
     if(mode === 'dark') {
@@ -3310,34 +3533,51 @@ function updateWorklogDateDisplay() {
     if(displayEl) displayEl.textContent = text;
 }
 
-function loadWorklogPage() {
-    console.log('[Worklog] Loading worklog page...');
+async function loadWorklogPage() {
+    console.log('[Worklog] Loading worklog page from database...');
     wlCurrentDate = new Date();
     const modeEl = document.getElementById('wl-view-mode');
     if(modeEl) modeEl.value = wlViewMode;
     updateWorklogDateDisplay();
     
     try {
+        const { data, error } = await supabase
+            .from('worklogs')
+            .select('*')
+            .eq('user_id', MOCK_USER.uuid)
+            .order('date', { ascending: false });
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            worklogEntries = data.map(row => ({
+                id: row.id,
+                date: row.date || '',
+                startTime: (row.start_time || '09:00:00').substring(0, 5),
+                endTime: (row.end_time || '18:00:00').substring(0, 5),
+                detail: row.detail || '',
+                status: row.status || 'Pending'
+            }));
+        } else {
+
+            worklogEntries = [];
+            addWorklogEntry();
+        }
+    } catch(e) {
+        console.warn('[Worklog] DB fetch failed:', e.message);
         const key = 'myWorklog_' + (MOCK_USER?.uuid || 'default');
         const drafts = JSON.parse(localStorage.getItem(key));
         if(drafts && drafts.entries && drafts.entries.length > 0) {
             worklogEntries = drafts.entries;
-            wlCounter = drafts.entries.map(e => parseInt(e.id.split('_')[1]||0)).reduce((a,b)=>Math.max(a,b), 0);
         } else {
             worklogEntries = [];
-            wlCounter = 0;
             addWorklogEntry();
         }
-    } catch(e) {
-        console.warn('[Worklog] Error loading drafts:', e);
-        worklogEntries = [];
-        wlCounter = 0;
-        addWorklogEntry();
     }
     
     renderWorklog();
-    console.log('[Worklog] Rendered', worklogEntries.length, 'entries');
 }
+
 
 function addWorklogEntry() {
     wlCounter++;
@@ -3430,20 +3670,36 @@ function renderWorklog() {
     });
 }
 
-function saveWorklogDraft() {
-    confirmAction('ยืนยันการบันทึกรายการทำงานทั้งหมด?', '', () => {
+async function saveWorklogDraft() {
+    confirmAction('ยืนยันการบันทึกรายการทำงานทั้งหมด?', 'ข้อมูลจะถูกบันทึกลงฐานข้อมูลส่วนกลาง', async () => {
         try {
-            if(MOCK_USER && MOCK_USER.uuid) {
-               localStorage.setItem('myWorklog_' + MOCK_USER.uuid, JSON.stringify({
-                   entries: worklogEntries
-               }));
-            }
-            alert('บันทึกข้อมูลการทำงาน (Draft / Submit) เรียบร้อยแล้ว');
+            if(!MOCK_USER || !MOCK_USER.uuid) throw new Error('User not identified');
+
+            const payloads = worklogEntries.map(e => ({
+                user_id: MOCK_USER.uuid,
+                date: e.date,
+                start_time: e.startTime,
+                end_time: e.endTime,
+                detail: e.detail,
+                status: e.status
+            }));
+
+            const { error } = await supabase.from('worklogs').upsert(payloads);
+            if (error) throw error;
+
+            localStorage.setItem('myWorklog_' + MOCK_USER.uuid, JSON.stringify({
+                entries: worklogEntries
+            }));
+            
+            alert('บันทึกข้อมูลการทำงานลงฐานข้อมูลเรียบร้อยแล้ว');
+            loadWorklogPage();
         } catch(e) {
-            alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+            console.error('[Worklog] Save failed:', e);
+            alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + e.message);
         }
     });
 }
+
 
 function exportWorklog() {
     if(worklogEntries.length === 0) {
@@ -3482,3 +3738,32 @@ function sendWorklogMonthly() {
         alert('ส่งรายงานประจำเดือนให้ผู้บริหารทางอีเมลเรียบร้อยแล้ว (Mock System)');
     });
 }
+
+// ─── UTILITIES & HELPERS ───────────────────────────
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Earth radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+async function logActivity(action, detail = '') {
+    try {
+        const payload = {
+            user_id: MOCK_USER ? MOCK_USER.uuid : null,
+            action: action,
+            detail: detail,
+            ip_address: 'browser-client'
+        };
+        await supabase.from('audit_logs').insert([payload]);
+    } catch(e) {
+        console.warn('Silent fail: Audit log could not be saved', e);
+    }
+}
+
