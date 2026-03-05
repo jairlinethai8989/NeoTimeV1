@@ -53,7 +53,7 @@ const MOCK_USER = {
         'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'manage-shifts',
         'my-requests', 'approve-requests', 'approve-leave',
         'report-general', 'report-leave', 'audit-log',
-        'users', 'workplaces'
+        'users', 'workplaces', 'settings'
     ]
 };
 
@@ -163,7 +163,7 @@ function getPermissionsByRole(role) {
         'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'manage-shifts',
         'my-requests', 'approve-requests', 'approve-leave',
         'report-general', 'report-leave', 'audit-log',
-        'users', 'workplaces'
+        'users', 'workplaces', 'settings'
     ];
     
     const supervisorMenus = [
@@ -1816,6 +1816,8 @@ function renderManageShiftsTable() {
                 <span class="badge" style="background:#fef3c7; color:#f59e0b;">Sat=เสาร์</span>
                 <span class="badge" style="background:#fee2e2; color:#ef4444;">Sun=อาทิตย์</span>
                 <span class="badge" style="background:#f3f4f6; color:var(--text-muted);">O=หยุด</span>
+                <span class="badge" style="background:#dcfce7; color:var(--success);">M=เช้า</span>
+                <span class="badge" style="background:#fef9c3; color:var(--warning);">A=บ่าย</span>
             </div>
             ${manualShiftData.length > 0 ? `
             <div style="display:flex; gap:8px;">
@@ -3321,11 +3323,12 @@ function openDocModal(reqId, context) {
 function exportDocToPDF() {
     const element = document.getElementById('pdf-export-container');
     const opt = {
-      margin:       0,
+      margin:       [10, 10, 10, 10], // Use margins to avoid overflow
       filename:     `doc-${document.getElementById('doc-req-id').textContent}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait', compress: true },
+      pagebreak:    { mode: 'avoid-all' }
     };
 
     html2pdf().set(opt).from(element).save();
