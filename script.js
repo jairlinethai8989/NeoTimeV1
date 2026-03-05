@@ -45,8 +45,16 @@ let clockIntervalId = null;
 
 // TODO: Connect to real User Data
 const MOCK_USER = {
-    id: '',
-    name: ''
+    id: 'ADMIN001',
+    name: 'Default Admin',
+    uuid: 'default-uuid',
+    role: 'HR Admin',
+    permissions: [
+        'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'manage-shifts',
+        'my-requests', 'approve-requests', 'approve-leave',
+        'report-general', 'report-leave', 'audit-log',
+        'users', 'workplaces'
+    ]
 };
 
 // ─── Initialization ─────────────────────────────────
@@ -55,19 +63,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const path = window.location.pathname.toLowerCase();
     if (path.includes('login') || path.includes('line')) return;
 
-    // 1. ตรวจสอบสถานะการเข้าสู่ระบบ
+    /* 
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error || !session) {
-        // ถ้ายังไม่ได้ล็อกอิน ให้เด้งกลับไปหน้า login.html
         window.location.href = 'login.html';
         return;
     }
-
+    await loadCurrentUserProfile(session.user.id);
+    */
+    
     // Load System Settings (Theme & Logo)
     loadSystemSettings();
 
-    // 2. ถ้าล็อกอินแล้ว ดึงข้อมูล Profile มาเก็บใน MOCK_USER
-    await loadCurrentUserProfile(session.user.id);
+    // Default identification for demo/cleared mode
+    MOCK_USER.uuid = 'default-uuid';
+    applyUserPermissions();
+
+    // Sync UI with MOCK_USER
+    const nameEl = document.getElementById('user-display-name');
+    const roleEl = document.getElementById('user-display-role');
+    if (nameEl) nameEl.textContent = MOCK_USER.name;
+    if (roleEl) roleEl.textContent = MOCK_USER.role;
 
     // Update Header Date
     updateHeaderDate();
@@ -147,18 +163,18 @@ function getPermissionsByRole(role) {
         'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'manage-shifts',
         'my-requests', 'approve-requests', 'approve-leave',
         'report-general', 'report-leave', 'audit-log',
-        'users', 'workplaces', 'settings', 'profile'
+        'users', 'workplaces'
     ];
     
     const supervisorMenus = [
         'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts', 'manage-shifts',
         'my-requests', 'approve-requests', 'approve-leave',
-        'report-general', 'report-leave', 'profile'
+        'report-general', 'report-leave'
     ];
     
     const employeeMenus = [
         'dashboard', 'checkin', 'records', 'map', 'worklog', 'shifts',
-        'my-requests', 'profile'
+        'my-requests'
     ];
     
     if (checkIsAdmin(role)) return allMenus;
@@ -177,7 +193,7 @@ function applyUserPermissions() {
     // Check and hide/show page items
     document.querySelectorAll('.sidebar-nav .nav-item[data-page], .sidebar-nav .nav-child[data-page], .header-user-dropdown .dropdown-item[data-page]').forEach(item => {
         const page = item.getAttribute('data-page');
-        if (perms.includes(page) || page === 'profile') {
+        if (perms.includes(page)) {
             item.style.display = 'flex';
         } else {
             item.style.display = 'none'; // hide if no permission
@@ -202,8 +218,8 @@ function applyUserPermissions() {
 
     // Check if the current initialized page is allowed
     const startPage = document.querySelector('.nav-item.active[data-page]')?.getAttribute('data-page') || 'dashboard';
-    if (!perms.includes(startPage) && startPage !== 'profile' && startPage !== 'worklog') {
-        const fallbackPage = perms[0] || 'profile';
+    if (!perms.includes(startPage) && startPage !== 'worklog') {
+        const fallbackPage = perms[0] || 'dashboard';
         const targetEl = document.querySelector(`[data-page="${fallbackPage}"]`);
         if (targetEl) {
             navigateTo(fallbackPage, targetEl, targetEl.classList.contains('nav-child'));

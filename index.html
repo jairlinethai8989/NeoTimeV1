@@ -120,7 +120,6 @@
         <div class="nav-children">
           <a class="nav-child" data-page="users" onclick="navigateTo('users', this, true)">จัดการผู้ใช้</a>
           <a class="nav-child" data-page="workplaces" onclick="navigateTo('workplaces', this, true)">จัดการหน้างาน</a>
-          <a class="nav-child" data-page="settings" onclick="navigateTo('settings', this, true)">ตั้งค่าระบบ</a>
         </div>
       </div>
 
@@ -159,15 +158,9 @@
           <!-- Header User Dropdown -->
           <div class="header-user-dropdown" id="user-dropdown-menu">
             <div class="dropdown-header">
-                <strong>บัญชีของฉัน</strong>
+                <strong>ข้อมูลเบื้องต้น</strong>
             </div>
-            <a class="dropdown-item" data-page="profile" onclick="navigateTo('profile', this)">
-                <i class="fa-regular fa-user"></i> โปรไฟล์ของฉัน
-            </a>
-            <div class="dropdown-divider"></div>
-            <a class="dropdown-item btn-logout text-danger" onclick="logout()">
-                <i class="fa-solid fa-right-from-bracket"></i> ออกจากระบบ
-            </a>
+            <div class="dropdown-item">รหัส: ADMIN001</div>
           </div>
         </div>
       </div>
@@ -1035,97 +1028,11 @@
       </div>
 
       <!-- Page: Profile -->
+      <!-- Page: Profile (Hidden)
       <div class="page-content" id="page-profile">
-        <div class="management-header" style="margin-bottom: 24px;">
-          <h2 class="page-title"><i class="fa-regular fa-user"></i> โปรไฟล์ของฉัน</h2>
-        </div>
-
-        <div class="profile-container" style="max-width: 800px; margin: 0 auto; display: grid; gap: 24px;">
-          
-          <!-- Profile Header Card -->
-          <div class="card p-24" style="display: flex; align-items: center; gap: 24px; flex-wrap: wrap;">
-            <div class="profile-avatar" style="position: relative;">
-              <input type="file" id="profile-upload" hidden accept="image/*" onchange="previewProfileImage(this)">
-              <img src="https://ui-avatars.com/api/?name=User&background=2563eb&color=fff" id="profile-img-preview" alt="Avatar" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 4px solid var(--surface); box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-              <button type="button" class="btn-icon" style="position: absolute; bottom: 0; right: 0; background: var(--primary); color: white; width: 32px; height: 32px;" title="เปลี่ยนรูปโปรไฟล์" onclick="document.getElementById('profile-upload').click()"><i class="fa-solid fa-camera"></i></button>
-            </div>
-            <div class="profile-title-info" style="flex: 1;">
-              <h3 id="profile-display-name" style="font-size: 24px; margin-bottom: 4px;">กำลังโหลด...</h3>
-              <p id="profile-display-role" class="text-muted" style="margin-bottom: 8px;">-</p>
-              <span id="profile-display-status" class="badge badge-success">ใช้งาน</span>
-            </div>
-          </div>
-
-          <!-- Edit Form Card -->
-          <div class="card p-24">
-            <h4 style="margin-bottom: 20px; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;"><i class="fa-solid fa-address-card" style="color: var(--primary);"></i> ข้อมูลส่วนตัว</h4>
-            
-            <form id="profile-form" onsubmit="event.preventDefault(); saveProfileData();">
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-                
-                <div class="form-group">
-                  <label>รหัสพนักงาน (ไม่สามารถแก้ไขได้)</label>
-                  <input type="text" id="prof-empid" class="form-control" disabled style="background-color: var(--bg-main);">
-                </div>
-
-                <div class="form-group">
-                  <label>ชื่อ-นามสกุล <span class="text-danger">*</span></label>
-                  <input type="text" id="prof-name" class="form-control" required>
-                </div>
-
-                <div class="form-group">
-                  <label>อีเมล</label>
-                  <input type="email" id="prof-email" class="form-control">
-                </div>
-
-                <div class="form-group">
-                  <label>บทบาท (ไม่สามารถแก้ไขได้)</label>
-                  <input type="text" id="prof-role" class="form-control" disabled style="background-color: var(--bg-main);">
-                </div>
-
-                <div class="form-group">
-                  <label>เบอร์โทรศัพท์ติดต่อ</label>
-                  <input type="tel" id="prof-phone" class="form-control" placeholder="08X-XXX-XXXX">
-                </div>
-
-                <div class="form-group">
-                  <label>แผนก / ฝ่าย</label>
-                  <input type="text" id="prof-department" class="form-control" placeholder="เช่น ไอที, ฝ่ายขาย">
-                </div>
-                
-                <div class="form-group" style="grid-column: 1 / -1; margin-top: 12px;">
-                  <label>ลายเซ็นอิเล็กทรอนิกส์</label>
-                  <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: start; background: var(--bg-main); padding: 16px; border-radius: 8px;">
-                     <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; background: white; border: 1px dashed var(--border); border-radius: 8px; position: relative;">
-                      <img id="saved-signature-preview" src="" style="max-width: 100%; max-height: 80px; display: none;" alt="Saved Signature">
-                      <p id="no-signature-text" class="text-muted" style="font-size: 13px; margin: 0 0 12px 0;">ยังไม่มีลายเซ็นในระบบ</p>
-                      <div style="display: flex; gap: 8px;">
-                        <button type="button" class="btn btn-outline" style="z-index: 10;" onclick="openSignatureModal()"><i class="fa-solid fa-pen-nib"></i> จัดการลายเซ็นของฉัน</button>
-                        <button type="button" class="btn btn-outline text-danger" style="z-index: 10; border-color: #fee2e2;" onclick="clearProfileSignature()"><i class="fa-solid fa-eraser"></i> ล้างลายเซ็น</button>
-                      </div>
-                    </div>
-                  </div>
-                  <input type="hidden" id="prof-signature_base64">
-                </div>
-
-              </div>
-              
-              <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px; border-top: 1px solid var(--border); padding-top: 16px;">
-                <button type="button" class="btn btn-outline" onclick="loadProfileData()"><i class="fa-solid fa-rotate-left"></i> รีเซ็ต</button>
-                <button type="submit" class="btn btn-primary" id="btn-save-profile"><i class="fa-solid fa-floppy-disk"></i> บันทึกข้อมูล</button>
-              </div>
-            </form>
-          </div>
-
-          <!-- Password Reset Card -->
-          <div class="card p-24">
-            <h4 style="margin-bottom: 20px; font-size: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px;"><i class="fa-solid fa-lock" style="color: var(--warning);"></i> ความปลอดภัย</h4>
-            <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">หากต้องการเปลี่ยนรหัสผ่าน กรุณากดปุ่มด้านล่าง ระบบจะส่งลิงก์สำหรับรีเซ็ตรหัสผ่านไปยังอีเมลของคุณ</p>
-            <button class="btn btn-outline" onclick="requestPasswordReset()"><i class="fa-solid fa-envelope"></i> ส่งลิงก์รีเซ็ตรหัสผ่าน</button>
-          </div>
-
-        </div>
+        ...
       </div>
+      -->
 
     </div>
 
