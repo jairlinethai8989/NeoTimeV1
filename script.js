@@ -606,8 +606,13 @@ async function submitCheckin(type) {
             time: new Date().toLocaleTimeString('en-GB')
         };
 
-        const { error: insertError } = await supabase.from('attendance_logs').insert([payload]);
-        if (insertError) throw insertError;
+        if (realUserId === 'default-uuid') {
+            console.log("Demo Mode: Skipping real DB insert for attendance_logs", payload);
+            await new Promise(resolve => setTimeout(resolve, 300));
+        } else {
+            const { error: insertError } = await supabase.from('attendance_logs').insert([payload]);
+            if (insertError) throw insertError;
+        }
 
         // Log Activity
         logActivity(`${type} (${checkinCategory})`, `Location: ${closestWp ? closestWp.name : 'Unknown'}, Status: ${status}, Distance: ${Math.round(distanceVal)}m`);
@@ -3840,6 +3845,10 @@ async function logActivity(action, detail = '') {
             detail: detail,
             ip_address: 'browser-client'
         };
+        if (payload.user_id === 'default-uuid') {
+            console.log("Demo Mode: Skipping audit log", payload);
+            return;
+        }
         await supabase.from('audit_logs').insert([payload]);
     } catch(e) {
         console.warn('Silent fail: Audit log could not be saved', e);
