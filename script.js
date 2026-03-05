@@ -1819,9 +1819,9 @@ function renderManageShiftsTable() {
             </div>
             ` : ''}
         </div>
-        <div class="table-responsive" style="max-height: 600px; overflow: auto; border: 1px solid var(--border); border-top: none; width: 100%;">
-            <table class="data-table" style="font-size: 13px; text-align: center; white-space: nowrap; width: 100%; min-width: 1100px;">
-                <thead><tr>${headerHtml}</tr></thead>
+        <div style="max-height: 65vh; overflow: auto; border: 1px solid var(--border); border-top: none; width: 100%; position: relative;">
+            <table class="data-table" style="font-size: 13px; text-align: center; white-space: nowrap; width: 100%; border-collapse: separate; border-spacing: 0;">
+                <thead style="position: sticky; top: 0; z-index: 30;"><tr>${headerHtml}</tr></thead>
                 <tbody>${bodyHtml}</tbody>
             </table>
         </div>
