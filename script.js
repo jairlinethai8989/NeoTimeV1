@@ -1788,8 +1788,6 @@ function renderManageShiftsTable() {
                  else if(shiftVal === 'N' || shiftVal === 'Night') color = '#1e293b';
                  else if(shiftVal === 'Sat') color = '#f59e0b';
                  else if(shiftVal === 'Sun') color = '#ef4444';
-                 else if(shiftVal === 'M') color = 'var(--success)';
-                 else if(shiftVal === 'A') color = 'var(--warning)';
 
                  bodyHtml += `<td style="text-align:center; padding: 0; border: 1px solid #f1f5f9;">
                     <select class="form-control" style="width:100%; height:100%; border:none; padding: 4px 2px; background: transparent; font-weight:bold; color:${color}; cursor:pointer; text-align:center; appearance: none; font-size: 12px; min-width: 50px;" onchange="updateManualShift(${empIdx}, ${d-1}, this.value)">
@@ -1798,8 +1796,6 @@ function renderManageShiftsTable() {
                       <option value="O" ${shiftVal==='O'?'selected':''} style="color:var(--text-muted)">O</option>
                       <option value="Sat" ${shiftVal==='Sat'?'selected':''} style="color:#f59e0b">Sat</option>
                       <option value="Sun" ${shiftVal==='Sun'?'selected':''} style="color:#ef4444">Sun</option>
-                      <option value="M" ${shiftVal==='M'?'selected':''} style="color:var(--success)">M</option>
-                      <option value="A" ${shiftVal==='A'?'selected':''} style="color:var(--warning)">A</option>
                     </select>
                  </td>`;
              }
@@ -1816,8 +1812,6 @@ function renderManageShiftsTable() {
                 <span class="badge" style="background:#fef3c7; color:#f59e0b;">Sat=เสาร์</span>
                 <span class="badge" style="background:#fee2e2; color:#ef4444;">Sun=อาทิตย์</span>
                 <span class="badge" style="background:#f3f4f6; color:var(--text-muted);">O=หยุด</span>
-                <span class="badge" style="background:#dcfce7; color:var(--success);">M=เช้า</span>
-                <span class="badge" style="background:#fef9c3; color:var(--warning);">A=บ่าย</span>
             </div>
             ${manualShiftData.length > 0 ? `
             <div style="display:flex; gap:8px;">
@@ -1825,8 +1819,8 @@ function renderManageShiftsTable() {
             </div>
             ` : ''}
         </div>
-        <div class="table-responsive" style="max-height: 600px; overflow: auto; border: 1px solid var(--border); border-top: none;">
-            <table class="data-table" style="font-size: 13px; text-align: center; white-space: nowrap; width: auto; min-width: 100%;">
+        <div class="table-responsive" style="max-height: 600px; overflow: auto; border: 1px solid var(--border); border-top: none; width: 100%;">
+            <table class="data-table" style="font-size: 13px; text-align: center; white-space: nowrap; width: 100%; min-width: 1100px;">
                 <thead><tr>${headerHtml}</tr></thead>
                 <tbody>${bodyHtml}</tbody>
             </table>
@@ -2038,10 +2032,8 @@ function generateAIShifts() {
             for(let d=1; d<=daysInMon; d++) {
                 const r = Math.random();
                 let txt = 'O'; 
-                if(r > 0.85) txt = 'D';       // ดึก (22:00-06:00)
-                else if(r > 0.7) txt = 'N';   // ค่ำ (16:00-00:00)
-                else if(r > 0.5) txt = 'M';   // เช้า (08:00-16:00)
-                else if(r > 0.15) txt = 'A';  // บ่าย (12:00-20:00)
+                if(r > 0.7) txt = 'D';       
+                else if(r > 0.4) txt = 'N';   
                 shifts.push(txt);
             }
             return { empName: emp, shifts: shifts };
